@@ -3,7 +3,7 @@ import { Client, MONTHS, Status, AppSettings } from '../types';
 import { StatusIndicator } from './StatusIndicator';
 import { SettingsPanel } from './SettingsPanel';
 import { Search, Plus, Filter, MoreVertical, Edit2, Trash2, X } from 'lucide-react';
-import { supabase } from '../lib/supabase'; // Ajuste o caminho se necessário
+import { supabase } from '../supabase'; // Ajuste o caminho se necessário
 
 export function Dashboard() {
   // Estados iniciais vazios, aguardando o Supabase
