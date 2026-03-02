@@ -231,7 +231,7 @@ export function Dashboard() {
               <div className="flex flex-wrap gap-3 w-full lg:w-auto">
                 {/* Filtro de Responsável Dinâmico */}
                 <select value={filterResponsavel} onChange={(e) => setFilterResponsavel(e.target.value)} className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none">
-                  <option value="">Analistas com Clientes</option>
+                  <option value="">Responsável</option>
                   {activeAnalysts.map(a => <option key={a} value={a}>{a}</option>)}
                 </select>
                 <select value={filterAtividade} onChange={(e) => setFilterAtividade(e.target.value)} className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none"><option value="">Atividades</option>{settings.atividades.map(a => <option key={a} value={a}>{a}</option>)}</select>
