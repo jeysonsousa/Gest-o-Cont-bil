@@ -4,6 +4,7 @@ export interface Client {
   id: string;
   responsavel: string;
   empresa: string;
+  sem_movimento?: boolean;
   atividade: string;
   prioridade: string;
   tributacao: string;
