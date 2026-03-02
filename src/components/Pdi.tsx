@@ -58,7 +58,10 @@ export function Pdi() {
         const dbEntries = pdiData || [];
         const combined: PdiEntry[] = [...dbEntries];
 
-        clients.forEach((client: Client) => {
+        // FILTRO INTELIGENTE: Ignora empresas sem movimento para não poluir o PDI
+        const activeClients = clients.filter((c: Client) => !c.sem_movimento);
+
+        activeClients.forEach((client: Client) => {
           const exists = dbEntries.find(e => e.empresa === client.empresa && !e.is_extra);
           if (!exists) {
             combined.push({
@@ -69,7 +72,7 @@ export function Pdi() {
               inicio: '',
               termino: '',
               prazo_realizado: '',
-              percentual: 0, // Mantido no objeto por compatibilidade de banco, mas não usado na UI
+              percentual: 0, 
               status: 'n',
               observacao: '',
               mes: activeMonth,
@@ -171,7 +174,6 @@ export function Pdi() {
     setSaving(true);
     try {
       for (const row of localData) {
-        // CORREÇÃO: Formatação inteligente para datas em branco virarem null
         const dbRow = {
           ...row,
           inicio: row.inicio || null,
