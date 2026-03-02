@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Dashboard } from './components/Dashboard';
-// import { Pdi } from './components/Pdi'; // Deixei comentado, vamos criar esse arquivo a seguir!
+import { Pdi } from './components/Pdi';
 import { LayoutDashboard, Target } from 'lucide-react';
 
 export default function App() {
@@ -47,10 +47,7 @@ export default function App() {
         {currentRoute === 'dashboard' ? (
           <Dashboard />
         ) : (
-          <div className="min-h-screen flex items-center justify-center flex-col gap-4 text-slate-500">
-            <Target size={48} className="text-indigo-300" />
-            <h2 className="text-xl font-semibold">Tela do PDI em construção...</h2>
-          </div>
+          <Pdi />
         )}
       </div>
     </div>
