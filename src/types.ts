@@ -1,14 +1,27 @@
+/**
+ * @developer Jeyson Lins
+ * @contact jeyson.cont@gmail.com | 91983617032
+ */
+
 export type Status = 'completed' | 'pending' | 'delayed' | 'not_started';
+
+// SOLICITAÇÃO: Registro histórico para auditoria de quem concluiu a tarefa na época
+export interface StatusRecord {
+  val: Status;
+  resp: string; // Nome do analista responsável no momento da conclusão
+}
 
 export interface Client {
   id: string;
   responsavel: string;
   empresa: string;
   sem_movimento?: boolean;
+  is_inactive?: boolean; // SOLICITAÇÃO: Flag para empresas que deixaram de ser clientes
   atividade: string;
   prioridade: string;
   tributacao: string;
-  status: Record<string, Status>;
+  // O status agora aceita o formato simples (legado) ou o objeto com histórico
+  status: Record<string, Status | StatusRecord>;
 }
 
 export interface AppSettings {
@@ -27,7 +40,7 @@ export interface PdiEntry {
   id?: string;
   responsavel: string;
   empresa: string;
-  atividade: string;
+  atividade: string; // Coluna "AÇÃO" no layout do PDI
   competencia: string;
   inicio: string;
   termino: string;
