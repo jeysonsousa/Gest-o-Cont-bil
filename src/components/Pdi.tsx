@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../supabase';
-import { PdiEntry, Client, AppSettings, MONTHS } from '../types';
+import { PdiEntry, Client, AppSettings, MONTHS, Status, StatusRecord } from '../types';
 import { Save, Plus, Trash2, Target, Check, CheckCheck } from 'lucide-react';
 
 const currentYearNum = new Date().getFullYear();
@@ -23,28 +23,25 @@ export function Pdi() {
   // Dados
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [localData, setLocalData] = useState<PdiEntry[]>([]);
+  const [baseClients, setBaseClients] = useState<Client[]>([]); // Guarda os clientes originais para sincronia
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
   // 1. Carregar Configurações e Analistas Dinamicamente
   useEffect(() => {
     async function fetchData() {
-      // Busca as configurações (mantido para compatibilidade, se necessário no futuro)
       const { data: settingsData } = await supabase.from('settings').select('*').eq('id', 1).single();
       if (settingsData) {
         setSettings(settingsData);
       }
 
-      // Busca todos os clientes para extrair a lista real de responsáveis ativos
       const { data: clientsData } = await supabase.from('clients').select('responsavel, is_inactive, sem_movimento');
       if (clientsData) {
-        // Filtra ignorando ex-clientes (is_inactive)
         const list = clientsData.filter(c => !c.is_inactive).map(c => c.responsavel);
         const uniqueAnalysts = [...new Set(list)].sort();
         
         setActiveAnalysts(uniqueAnalysts);
         
-        // Se ainda não tem responsável selecionado e a lista não for vazia, seleciona o primeiro
         if (uniqueAnalysts.length > 0 && !activeResponsavel) {
           setActiveResponsavel(uniqueAnalysts[0]);
         }
@@ -76,8 +73,8 @@ export function Pdi() {
         const dbEntries = pdiData || [];
         const combined: PdiEntry[] = [...dbEntries];
 
-        // FILTRO INTELIGENTE: Ignora empresas "Sem movimento" e "Ex-clientes (Inativos)"
         const activeClients = clients.filter((c: Client) => !c.sem_movimento && !c.is_inactive);
+        setBaseClients(activeClients); // Salva para a sincronização depois
 
         activeClients.forEach((client: Client) => {
           const exists = dbEntries.find(e => e.empresa === client.empresa && !e.is_extra);
@@ -85,7 +82,7 @@ export function Pdi() {
             combined.push({
               responsavel: activeResponsavel,
               empresa: client.empresa,
-              atividade: 'Contabilização', // Valor padrão inteligente
+              atividade: 'Contabilização',
               competencia: `${activeMonth}/${activeYear}`,
               inicio: '',
               termino: '',
@@ -112,11 +109,9 @@ export function Pdi() {
     fetchPdiData();
   }, [activeMonth, activeYear, activeResponsavel]);
 
-  // Cálculos Automáticos baseados na conclusão (Status)
   const metrics = useMemo(() => {
     if (localData.length === 0) return { avg: 0, total: 0, completed: 0 };
     const total = localData.length;
-    // Considera concluído se o analista finalizou ou gestor validou
     const completed = localData.filter(d => d.status === 'analyst' || d.status === 'ok').length;
     const avg = Math.round((completed / total) * 100);
     return { avg, total, completed };
@@ -132,7 +127,7 @@ export function Pdi() {
     setLocalData([...localData, {
       responsavel: activeResponsavel,
       empresa: '',
-      atividade: '', // Extras começam vazios
+      atividade: '',
       competencia: `${activeMonth}/${activeYear}`,
       inicio: '',
       termino: '',
@@ -158,24 +153,21 @@ export function Pdi() {
     }
   };
 
-  // Ação 1: Confirmação do Analista
   const handleAnalystConfirm = (index: number) => {
     const newData = [...localData];
     const row = newData[index];
     
     if (row.status === 'n') {
       newData[index].status = 'analyst';
-      // Preenche data de hoje se o analista esqueceu de colocar
       if (!row.prazo_realizado) {
         newData[index].prazo_realizado = new Date().toISOString().split('T')[0];
       }
     } else {
-      newData[index].status = 'n'; // Desfaz a ação
+      newData[index].status = 'n';
     }
     setLocalData(newData);
   };
 
-  // Ação 2: Validação do Gestor
   const handleManagerConfirm = (index: number) => {
     const newData = [...localData];
     const row = newData[index];
@@ -183,7 +175,7 @@ export function Pdi() {
     if (row.status === 'analyst') {
       newData[index].status = 'ok';
     } else if (row.status === 'ok') {
-      newData[index].status = 'analyst'; // Desfaz a validação
+      newData[index].status = 'analyst';
     }
     setLocalData(newData);
   };
@@ -192,6 +184,7 @@ export function Pdi() {
     setSaving(true);
     try {
       for (const row of localData) {
+        // 1. Salva no banco de dados do PDI
         const dbRow = {
           ...row,
           inicio: row.inicio || null,
@@ -209,8 +202,31 @@ export function Pdi() {
             row.id = data[0].id;
           }
         }
+
+        // 2. INTEGRAÇÃO: Sincroniza a conclusão automaticamente com o Painel de Status
+        if (!row.is_extra) {
+          const client = baseClients.find(c => c.empresa === row.empresa);
+          if (client) {
+            const monthKey = `${activeMonth}-${activeYear}`;
+            const isPdiCompleted = row.status === 'analyst' || row.status === 'ok';
+            
+            const targetStatus: Status = isPdiCompleted ? 'completed' : 'pending';
+            
+            const currentStatusData = client.status[monthKey];
+            const currentVal = typeof currentStatusData === 'object' ? currentStatusData.val : (currentStatusData || 'not_started');
+
+            // Se o PDI foi concluído mas o Painel não está, ou se o PDI foi reaberto e o Painel estava concluído
+            if (currentVal !== targetStatus && (isPdiCompleted || currentVal === 'completed')) {
+              const newRecord: StatusRecord = { val: targetStatus, resp: activeResponsavel };
+              const newStatusObj = { ...client.status, [monthKey]: newRecord };
+              
+              await supabase.from('clients').update({ status: newStatusObj }).eq('id', client.id);
+              client.status = newStatusObj; // Atualiza cache local
+            }
+          }
+        }
       }
-      alert('PDI Salvo com sucesso!');
+      alert('PDI Salvo e Painel de Status Sincronizado com sucesso!');
     } catch (error) {
       console.error('Erro ao salvar:', error);
       alert('Erro ao salvar o PDI.');
@@ -219,19 +235,17 @@ export function Pdi() {
     }
   };
 
-  // Lógica do Farol Inteligente
   const getTrafficLight = (row: PdiEntry) => {
     if (row.status === 'n') return { color: 'bg-gray-200', title: 'Pendente' };
     
     if (row.termino && row.prazo_realizado) {
-      // Comparação de datas no formato YYYY-MM-DD
       if (row.prazo_realizado <= row.termino) {
         return { color: 'bg-emerald-500', title: 'Concluído no Prazo' };
       } else {
         return { color: 'bg-red-500', title: 'Concluído Fora do Prazo' };
       }
     }
-    return { color: 'bg-emerald-500', title: 'Concluído' }; // Se não houver data de término estipulada
+    return { color: 'bg-emerald-500', title: 'Concluído' };
   };
 
   const radius = 50;
@@ -252,7 +266,7 @@ export function Pdi() {
           <select 
             value={activeResponsavel} 
             onChange={(e) => setActiveResponsavel(e.target.value)}
-            className="bg-white border border-slate-200 px-3 py-2 rounded-lg text-sm font-medium focus:outline-none focus:border-indigo-500"
+            className="bg-white border border-slate-200 px-3 py-2 rounded-lg text-sm font-medium focus:outline-none focus:border-indigo-500 min-w-[150px]"
           >
             {activeAnalysts.map(r => <option key={r} value={r}>{r}</option>)}
           </select>
@@ -312,7 +326,7 @@ export function Pdi() {
 
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="flex justify-between items-center p-4 border-b border-slate-200 bg-slate-50">
-          <h2 className="font-bold text-slate-700">Plano de Ação de {activeResponsavel}</h2>
+          <h2 className="font-bold text-slate-700 uppercase text-sm tracking-wider">Plano de Ação de {activeResponsavel}</h2>
           <div className="flex gap-3">
             <button onClick={handleAddExtra} className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 rounded-lg transition-colors">
               <Plus size={16} /> Adicionar Extra
@@ -328,16 +342,16 @@ export function Pdi() {
             <div className="p-8 text-center text-slate-500">Carregando carteira de clientes...</div>
           ) : (
             <table className="w-full text-sm text-left whitespace-nowrap">
-              <thead className="bg-slate-200 text-slate-700 font-bold text-xs uppercase">
+              <thead className="bg-slate-200 text-slate-700 font-bold text-[10px] uppercase tracking-wider">
                 <tr>
-                  <th className="px-3 py-3 border-r border-slate-300">Empresas</th>
-                  <th className="px-3 py-3 border-r border-slate-300">Ação</th>
-                  <th className="px-3 py-3 border-r border-slate-300">Competência</th>
-                  <th className="px-3 py-3 border-r border-slate-300 w-32">Início</th>
-                  <th className="px-3 py-3 border-r border-slate-300 w-32">Término</th>
-                  <th className="px-3 py-3 border-r border-slate-300 w-32">Prazo Realiz.</th>
+                  <th className="px-4 py-3 border-r border-slate-300">Empresas</th>
+                  <th className="px-4 py-3 border-r border-slate-300">Ação</th>
+                  <th className="px-4 py-3 border-r border-slate-300 text-center w-24">Competência</th>
+                  <th className="px-3 py-3 border-r border-slate-300 w-32 text-center">Início</th>
+                  <th className="px-3 py-3 border-r border-slate-300 w-32 text-center">Término</th>
+                  <th className="px-3 py-3 border-r border-slate-300 w-32 text-center">Prazo Realiz.</th>
                   <th className="px-3 py-3 border-r border-slate-300 w-16 text-center">Status</th>
-                  <th className="px-3 py-3 border-r border-slate-300">Observação</th>
+                  <th className="px-4 py-3 border-r border-slate-300">Observação</th>
                   <th className="px-3 py-3 text-center">Validações / Ações</th>
                 </tr>
               </thead>
@@ -347,13 +361,13 @@ export function Pdi() {
                   return (
                     <tr key={index} className={row.is_extra ? 'bg-indigo-50/30' : 'hover:bg-slate-50'}>
                       <td className="p-1 border-r border-slate-200">
-                        <input type="text" value={row.empresa} onChange={(e) => handleInputChange(index, 'empresa', e.target.value)} disabled={!row.is_extra} className={`w-full p-2 outline-none uppercase font-medium text-xs ${!row.is_extra ? 'bg-transparent text-slate-700' : 'bg-white border border-slate-300 rounded'}`} placeholder="Nome da Empresa" />
+                        <input type="text" value={row.empresa} onChange={(e) => handleInputChange(index, 'empresa', e.target.value)} disabled={!row.is_extra} className={`w-full p-2 outline-none uppercase font-bold text-xs ${!row.is_extra ? 'bg-transparent text-slate-700' : 'bg-white border border-slate-300 rounded'}`} placeholder="NOME DA EMPRESA" />
                       </td>
                       <td className="p-1 border-r border-slate-200">
-                        <input type="text" value={row.atividade} onChange={(e) => handleInputChange(index, 'atividade', e.target.value)} className="w-full p-2 outline-none bg-transparent text-blue-700 font-medium text-xs" placeholder="Qual a ação?" />
+                        <input type="text" value={row.atividade} onChange={(e) => handleInputChange(index, 'atividade', e.target.value)} className="w-full p-2 outline-none bg-transparent text-indigo-700 font-bold text-xs" placeholder="Qual a ação?" />
                       </td>
-                      <td className="p-1 border-r border-slate-200">
-                        <input type="text" value={row.competencia} onChange={(e) => handleInputChange(index, 'competencia', e.target.value)} className="w-full p-2 outline-none bg-transparent text-slate-600 text-xs" />
+                      <td className="p-1 border-r border-slate-200 text-center">
+                        <input type="text" value={row.competencia} onChange={(e) => handleInputChange(index, 'competencia', e.target.value)} className="w-full p-2 outline-none bg-transparent text-slate-500 text-xs text-center" />
                       </td>
                       <td className="p-1 border-r border-slate-200">
                         <input type="date" value={row.inicio || ''} onChange={(e) => handleInputChange(index, 'inicio', e.target.value)} className="w-full p-1.5 outline-none bg-white border border-slate-200 rounded text-xs text-slate-600" />
@@ -365,7 +379,7 @@ export function Pdi() {
                         <input type="date" value={row.prazo_realizado || ''} onChange={(e) => handleInputChange(index, 'prazo_realizado', e.target.value)} className="w-full p-1.5 outline-none bg-white border border-slate-200 rounded text-xs text-slate-600" />
                       </td>
                       <td className="p-1 border-r border-slate-200 text-center">
-                        <div className={`mx-auto w-4 h-4 rounded-full ${light.color}`} title={light.title}></div>
+                        <div className={`mx-auto w-4 h-4 rounded-full ${light.color} shadow-inner`} title={light.title}></div>
                       </td>
                       <td className="p-1 border-r border-slate-200">
                         <input type="text" value={row.observacao} onChange={(e) => handleInputChange(index, 'observacao', e.target.value)} className="w-full p-2 outline-none bg-transparent text-xs text-slate-600" placeholder="Insira uma nota..." />
@@ -374,7 +388,7 @@ export function Pdi() {
                         <div className="flex items-center justify-center gap-2">
                           <button 
                             onClick={() => handleAnalystConfirm(index)} 
-                            className={`p-1.5 rounded-md transition-colors ${row.status === 'analyst' || row.status === 'ok' ? 'bg-blue-100 text-blue-600' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`} 
+                            className={`p-1.5 rounded-md transition-colors ${row.status === 'analyst' || row.status === 'ok' ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`} 
                             title={row.status === 'n' ? "Finalizar Tarefa (Analista)" : "Tarefa Finalizada"}
                           >
                             <Check size={16} />
@@ -401,7 +415,7 @@ export function Pdi() {
                 })}
                 {localData.length === 0 && !loading && (
                   <tr>
-                    <td colSpan={9} className="p-8 text-center text-slate-500">Nenhum dado encontrado ou cliente associado a este responsável.</td>
+                    <td colSpan={9} className="p-8 text-center text-slate-500 font-medium">Nenhum dado encontrado ou cliente associado a este responsável.</td>
                   </tr>
                 )}
               </tbody>
