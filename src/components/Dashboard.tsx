@@ -65,7 +65,7 @@ export function Dashboard() {
   };
 
   const metrics = useMemo(() => {
-    let totalGeral = clients.length; // Solicitação 1: Total Geral
+    let totalGeral = clients.length; 
     let totalAtivos = 0; 
     let completed = 0; 
     let pending = 0; 
@@ -229,7 +229,7 @@ export function Dashboard() {
               </div>
             </div>
 
-            {/* Tabela com ROLAGEM LATERAL e COLUNAS FIXAS (Solicitação 2) */}
+            {/* Tabela com ROLAGEM LATERAL e COLUNAS FIXAS */}
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
               <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-slate-300">
                 <table className="w-full text-left text-sm whitespace-nowrap table-fixed border-separate border-spacing-0">
@@ -242,7 +242,7 @@ export function Dashboard() {
                       <th className="px-4 py-3 text-center w-[70px] border-b border-slate-200">Prior.</th>
                       <th className="px-4 py-3 w-[140px] border-r border-slate-200 border-b border-slate-200">Trib.</th>
                       {MONTHS.map(month => (
-                        <th key={month} className="px-3 py-3 text-center w-[55px] border-l border-slate-100 font-bold border-b border-slate-200">
+                        <th key={month} className="px-3 py-3 text-center w-[55px] border-l border-slate-100 font-bold border-b border-slate-200 uppercase">
                           {month}
                         </th>
                       ))}
@@ -279,7 +279,7 @@ export function Dashboard() {
         )}
       </div>
 
-      {/* Modal de Edição */}
+      {/* Modal de Edição CORRIGIDO: Campo de Empresa Editável */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
@@ -289,15 +289,16 @@ export function Dashboard() {
             </div>
             <form onSubmit={handleSaveClient} className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Empresa</label>
-                {editingClient ? (
-                  <div className="w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-lg text-slate-700 font-bold uppercase">{formData.empresa}</div>
-                ) : (
-                  <select required value={formData.empresa || ''} onChange={(e) => setFormData({...formData, empresa: e.target.value})} className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none">
-                    <option value="">Selecione...</option>
-                    {settings.empresas.map(e => <option key={e} value={e}>{e}</option>)}
-                  </select>
-                )}
+                <label className="block text-sm font-medium text-slate-700 mb-1">Nome da Empresa</label>
+                {/* Agora permitimos editar o nome diretamente se necessário */}
+                <input 
+                  type="text"
+                  required
+                  value={formData.empresa || ''}
+                  onChange={(e) => setFormData({...formData, empresa: e.target.value.toUpperCase()})}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 font-bold uppercase"
+                  placeholder="DIGITE O NOME DA EMPRESA"
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Responsável</label>
