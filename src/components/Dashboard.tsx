@@ -2,10 +2,9 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Client, MONTHS, Status, AppSettings } from '../types';
 import { StatusIndicator } from './StatusIndicator';
 import { SettingsPanel } from './SettingsPanel';
-import { Search, Plus, Filter, MoreVertical, Edit2, Trash2, X } from 'lucide-react';
+import { Search, Plus, ArrowUpDown, Edit2, Trash2, X } from 'lucide-react';
 import { supabase } from '../supabase';
 
-// Gerar anos dinâmicos (1 ano atrás até 3 anos no futuro)
 const currentYearNum = new Date().getFullYear();
 const YEARS = Array.from({ length: 5 }, (_, i) => (currentYearNum - 1 + i).toString());
 
@@ -18,18 +17,19 @@ export function Dashboard() {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'settings'>('dashboard');
   const [searchTerm, setSearchTerm] = useState('');
   
-  // Filters
+  // Filtros
   const [filterResponsavel, setFilterResponsavel] = useState('');
   const [filterAtividade, setFilterAtividade] = useState('');
   const [filterPrioridade, setFilterPrioridade] = useState('');
   const [filterTributacao, setFilterTributacao] = useState('');
 
-  // Modal State
+  // Ordenação
+  const [sortConfig, setSortConfig] = useState<{ key: keyof Client, direction: 'asc' | 'desc' } | null>(null);
+
+  // Modais e Datas
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [formData, setFormData] = useState<Partial<Client>>({});
-
-  // Date States
   const currentMonthIndex = new Date().getMonth();
   const [activeMonth, setActiveMonth] = useState<string>(MONTHS[currentMonthIndex]);
   const [activeYear, setActiveYear] = useState<string>(currentYearNum.toString());
@@ -38,29 +38,17 @@ export function Dashboard() {
     async function fetchData() {
       try {
         setLoading(true);
-        const { data: clientsData, error: clientsError } = await supabase
-          .from('clients')
-          .select('*')
-          .order('created_at', { ascending: true });
-          
+        const { data: clientsData, error: clientsError } = await supabase.from('clients').select('*').order('created_at', { ascending: true });
         if (clientsError) throw clientsError;
 
-        const { data: settingsData, error: settingsError } = await supabase
-          .from('settings')
-          .select('*')
-          .eq('id', 1)
-          .single();
-
+        const { data: settingsData, error: settingsError } = await supabase.from('settings').select('*').eq('id', 1).single();
         if (settingsError && settingsError.code !== 'PGRST116') throw settingsError;
 
         if (clientsData) setClients(clientsData);
         if (settingsData) {
           setSettings({
-            responsaveis: settingsData.responsaveis || [],
-            atividades: settingsData.atividades || [],
-            prioridades: settingsData.prioridades || [],
-            tributacoes: settingsData.tributacoes || [],
-            empresas: settingsData.empresas || []
+            responsaveis: settingsData.responsaveis || [], atividades: settingsData.atividades || [],
+            prioridades: settingsData.prioridades || [], tributacoes: settingsData.tributacoes || [], empresas: settingsData.empresas || []
           });
         }
       } catch (error) {
@@ -72,41 +60,30 @@ export function Dashboard() {
     fetchData();
   }, []);
 
-  // Motor Lógico: Calcula se o mês está atrasado baseado na regra contábil (prazo = fim do mês seguinte)
   const getEffectiveStatus = (client: Client, monthName: string, year: string): Status => {
     const monthKey = `${monthName}-${year}`;
     const dbStatus = client.status[monthKey] || 'not_started';
-
-    // Se já foi concluído, continua concluído
     if (dbStatus === 'completed') return 'completed';
 
     const monthIndex = MONTHS.indexOf(monthName);
     const targetYear = parseInt(year);
-
     const currentDate = new Date();
-    const currentYearAbsolute = currentDate.getFullYear();
-    const currentMonthAbsolute = currentDate.getMonth();
-
-    // Transforma a data num número absoluto de meses para comparar com precisão
-    // O prazo limite é o mês seguinte (monthIndex + 1)
+    
     const absoluteTargetDeadline = (targetYear * 12) + (monthIndex + 1);
-    const absoluteCurrent = (currentYearAbsolute * 12) + currentMonthAbsolute;
+    const absoluteCurrent = (currentDate.getFullYear() * 12) + currentDate.getMonth();
 
-    // Se o mês atual passou do prazo limite e não tá concluído, vira atrasado
-    if (absoluteCurrent > absoluteTargetDeadline) {
-      return 'delayed';
-    }
-
+    if (absoluteCurrent > absoluteTargetDeadline) return 'delayed';
     return dbStatus as Status;
   };
 
   const metrics = useMemo(() => {
-    let total = clients.length;
-    let completed = 0;
-    let pending = 0;
-    let delayed = 0;
+    let total = 0; let completed = 0; let pending = 0; let delayed = 0;
 
     clients.forEach(client => {
+      // Ignora empresas sem movimento nas métricas
+      if (client.sem_movimento) return; 
+      
+      total++;
       const status = getEffectiveStatus(client, activeMonth, activeYear);
       if (status === 'completed') completed++;
       if (status === 'pending') pending++;
@@ -118,33 +95,41 @@ export function Dashboard() {
 
   const handleStatusClick = async (clientId: string, monthName: string) => {
     const clientIndex = clients.findIndex(c => c.id === clientId);
-    if (clientIndex === -1) return;
+    // Impede alteração de status se a empresa estiver sem movimento
+    if (clientIndex === -1 || clients[clientIndex].sem_movimento) return;
     
     const client = clients[clientIndex];
     const monthKey = `${monthName}-${activeYear}`;
-    
-    // Pegamos o status real da tela (que já aplica o atraso automático)
     const currentEffectiveStatus = getEffectiveStatus(client, monthName, activeYear);
     let nextStatus: Status = 'not_started';
     
-    // Nova esteira de cliques
     switch (currentEffectiveStatus) {
       case 'not_started': nextStatus = 'pending'; break;
       case 'pending': nextStatus = 'completed'; break;
-      case 'delayed': nextStatus = 'completed'; break; // Fez atrasado
-      case 'completed': nextStatus = 'not_started'; break; // Reset
+      case 'delayed': nextStatus = 'completed'; break;
+      case 'completed': nextStatus = 'not_started'; break;
     }
 
     const newStatusObj = { ...client.status, [monthKey]: nextStatus };
-
     setClients(clients.map(c => c.id === clientId ? { ...c, status: newStatusObj } : c));
-
-    const { error } = await supabase.from('clients').update({ status: newStatusObj }).eq('id', clientId);
-    if (error) console.error('Erro ao atualizar status:', error);
+    await supabase.from('clients').update({ status: newStatusObj }).eq('id', clientId);
   };
 
-  const filteredClients = useMemo(() => {
-    return clients.filter(client => {
+  // Função para lidar com a flag "Sem Movimento" diretamente da tabela
+  const handleToggleSemMovimento = async (clientId: string, newValue: boolean) => {
+    setClients(clients.map(c => c.id === clientId ? { ...c, sem_movimento: newValue } : c));
+    await supabase.from('clients').update({ sem_movimento: newValue }).eq('id', clientId);
+  };
+
+  // Função de Ordenação
+  const handleSort = (key: keyof Client) => {
+    let direction: 'asc' | 'desc' = 'asc';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc';
+    setSortConfig({ key, direction });
+  };
+
+  const filteredAndSortedClients = useMemo(() => {
+    let result = clients.filter(client => {
       const matchesSearch = client.empresa.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesResponsavel = filterResponsavel ? client.responsavel === filterResponsavel : true;
       const matchesAtividade = filterAtividade ? client.atividade === filterAtividade : true;
@@ -152,38 +137,44 @@ export function Dashboard() {
       const matchesTributacao = filterTributacao ? client.tributacao === filterTributacao : true;
       return matchesSearch && matchesResponsavel && matchesAtividade && matchesPrioridade && matchesTributacao;
     });
-  }, [clients, searchTerm, filterResponsavel, filterAtividade, filterPrioridade, filterTributacao]);
+
+    if (sortConfig !== null) {
+      result.sort((a, b) => {
+        const aValue = a[sortConfig.key]?.toString() || '';
+        const bValue = b[sortConfig.key]?.toString() || '';
+        if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+    return result;
+  }, [clients, searchTerm, filterResponsavel, filterAtividade, filterPrioridade, filterTributacao, sortConfig]);
 
   const handleOpenModal = (client?: Client) => {
     if (client) {
-      setEditingClient(client);
-      setFormData(client);
+      setEditingClient(client); setFormData(client);
     } else {
-      setEditingClient(null);
-      setFormData({ responsavel: '', empresa: '', atividade: '', prioridade: 'A', tributacao: '', status: {} });
+      setEditingClient(null); setFormData({ responsavel: '', empresa: '', atividade: '', prioridade: 'A', tributacao: '', sem_movimento: false, status: {} });
     }
     setIsModalOpen(true);
   };
 
   const handleCloseModal = () => {
-    setIsModalOpen(false);
-    setEditingClient(null);
-    setFormData({});
+    setIsModalOpen(false); setEditingClient(null); setFormData({});
   };
 
   const handleSaveClient = async (e: React.FormEvent) => {
     e.preventDefault();
     if (editingClient) {
       const { error } = await supabase.from('clients').update({
-        responsavel: formData.responsavel, empresa: formData.empresa,
-        atividade: formData.atividade, prioridade: formData.prioridade, tributacao: formData.tributacao
+        responsavel: formData.responsavel, empresa: formData.empresa, atividade: formData.atividade, 
+        prioridade: formData.prioridade, tributacao: formData.tributacao, sem_movimento: formData.sem_movimento
       }).eq('id', editingClient.id);
-
       if (!error) setClients(clients.map(c => c.id === editingClient.id ? { ...c, ...formData } as Client : c));
     } else {
       const newClientData = {
-        responsavel: formData.responsavel, empresa: formData.empresa,
-        atividade: formData.atividade, prioridade: formData.prioridade, tributacao: formData.tributacao, status: {}
+        responsavel: formData.responsavel, empresa: formData.empresa, atividade: formData.atividade, 
+        prioridade: formData.prioridade, tributacao: formData.tributacao, sem_movimento: formData.sem_movimento || false, status: {}
       };
       const { data, error } = await supabase.from('clients').insert([newClientData]).select();
       if (!error && data) setClients([...clients, data[0] as Client]);
@@ -200,10 +191,7 @@ export function Dashboard() {
 
   const handleUpdateSettings = async (newSettings: AppSettings) => {
     setSettings(newSettings);
-    await supabase.from('settings').update({
-      responsaveis: newSettings.responsaveis, atividades: newSettings.atividades,
-      prioridades: newSettings.prioridades, tributacoes: newSettings.tributacoes, empresas: newSettings.empresas
-    }).eq('id', 1);
+    await supabase.from('settings').update(newSettings).eq('id', 1);
   };
 
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-600 font-medium">Carregando painel de gestão...</div>;
@@ -223,7 +211,7 @@ export function Dashboard() {
               <div className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200">
                 <label className="text-sm font-medium text-slate-600">Período:</label>
                 <select value={activeMonth} onChange={(e) => setActiveMonth(e.target.value)} className="bg-transparent text-sm font-bold text-slate-800 focus:outline-none cursor-pointer">
-                  {MONTHS.map(m => <option key={m} value={m}>{m}</option>)}
+                  {MONTHS.map(m => <option key={m} value={m}>{m.toUpperCase()}</option>)}
                 </select>
                 <span className="text-slate-300">/</span>
                 <select value={activeYear} onChange={(e) => setActiveYear(e.target.value)} className="bg-transparent text-sm font-bold text-slate-800 focus:outline-none cursor-pointer">
@@ -247,7 +235,7 @@ export function Dashboard() {
           <>
             {/* Metrics */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col"><span className="text-slate-500 text-sm font-medium">Total de Clientes</span><span className="text-3xl font-bold text-slate-800 mt-2">{metrics.total}</span></div>
+              <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col"><span className="text-slate-500 text-sm font-medium">Total de Clientes Ativos</span><span className="text-3xl font-bold text-slate-800 mt-2">{metrics.total}</span></div>
               <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col"><span className="text-slate-500 text-sm font-medium">Concluídos ({activeMonth}/{activeYear})</span><span className="text-3xl font-bold text-emerald-600 mt-2">{metrics.completed}</span></div>
               <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col"><span className="text-slate-500 text-sm font-medium">Pendentes ({activeMonth}/{activeYear})</span><span className="text-3xl font-bold text-amber-500 mt-2">{metrics.pending}</span></div>
               <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col"><span className="text-slate-500 text-sm font-medium">Atrasados ({activeMonth}/{activeYear})</span><span className="text-3xl font-bold text-red-500 mt-2">{metrics.delayed}</span></div>
@@ -285,11 +273,23 @@ export function Dashboard() {
                 <table className="w-full text-left text-sm whitespace-nowrap">
                   <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-medium">
                     <tr>
-                      <th className="px-4 py-3 sticky left-0 bg-slate-50 z-10 w-32">Responsável</th>
-                      <th className="px-4 py-3 sticky left-32 bg-slate-50 z-10 min-w-[200px]">Empresa</th>
-                      <th className="px-4 py-3">Atividade</th>
-                      <th className="px-4 py-3 text-center">Prioridade</th>
-                      <th className="px-4 py-3">Tributação</th>
+                      {/* Cabeçalhos Ordenáveis */}
+                      <th className="px-4 py-3 sticky left-0 bg-slate-50 z-10 w-32 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('responsavel')}>
+                        <div className="flex items-center gap-1">Responsável <ArrowUpDown size={14} className="text-slate-400"/></div>
+                      </th>
+                      <th className="px-4 py-3 sticky left-32 bg-slate-50 z-10 min-w-[200px] cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('empresa')}>
+                        <div className="flex items-center gap-1">Empresa <ArrowUpDown size={14} className="text-slate-400"/></div>
+                      </th>
+                      <th className="px-4 py-3 text-center w-24 border-r border-slate-100" title="Marcar se a empresa está sem movimento">S/ Mov.</th>
+                      <th className="px-4 py-3 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('atividade')}>
+                        <div className="flex items-center gap-1">Atividade <ArrowUpDown size={14} className="text-slate-400"/></div>
+                      </th>
+                      <th className="px-4 py-3 text-center cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('prioridade')}>
+                        <div className="flex items-center justify-center gap-1">Prior. <ArrowUpDown size={14} className="text-slate-400"/></div>
+                      </th>
+                      <th className="px-4 py-3 cursor-pointer hover:bg-slate-100 transition-colors border-r border-slate-100" onClick={() => handleSort('tributacao')}>
+                        <div className="flex items-center gap-1">Tributação <ArrowUpDown size={14} className="text-slate-400"/></div>
+                      </th>
                       {MONTHS.map(month => (
                         <th key={month} className="px-3 py-3 text-center">
                           <div style={{ writingMode: 'vertical-rl' }} className="transform rotate-180 text-xs tracking-wider mx-auto">{month.toUpperCase()}</div>
@@ -299,18 +299,27 @@ export function Dashboard() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {filteredClients.map((client) => (
-                      <tr key={client.id} className="hover:bg-slate-50/50 transition-colors group">
-                        <td className="px-4 py-3 sticky left-0 bg-white group-hover:bg-slate-50/50 z-10 font-medium text-slate-700">{client.responsavel}</td>
-                        <td className="px-4 py-3 sticky left-32 bg-white group-hover:bg-slate-50/50 z-10 font-medium text-slate-900">{client.empresa}</td>
+                    {filteredAndSortedClients.map((client) => (
+                      <tr key={client.id} className={`hover:bg-slate-50/50 transition-colors group ${client.sem_movimento ? 'opacity-60 bg-slate-50' : ''}`}>
+                        <td className="px-4 py-3 sticky left-0 z-10 font-medium text-slate-700 bg-inherit">{client.responsavel}</td>
+                        <td className="px-4 py-3 sticky left-32 z-10 font-medium text-slate-900 bg-inherit">{client.empresa}</td>
+                        <td className="px-4 py-3 text-center border-r border-slate-100">
+                          {/* Checkbox "Sem Movimento" */}
+                          <input type="checkbox" checked={client.sem_movimento || false} onChange={(e) => handleToggleSemMovimento(client.id, e.target.checked)} className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer" title="Marcar como Sem Movimento" />
+                        </td>
                         <td className="px-4 py-3 text-slate-600">{client.atividade}</td>
                         <td className="px-4 py-3 text-center">
                           <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${client.prioridade === 'A' ? 'bg-emerald-100 text-emerald-700' : client.prioridade === 'B' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-700'}`}>{client.prioridade}</span>
                         </td>
-                        <td className="px-4 py-3 text-slate-600">{client.tributacao}</td>
+                        <td className="px-4 py-3 text-slate-600 border-r border-slate-100">{client.tributacao}</td>
                         {MONTHS.map(month => (
                           <td key={month} className="px-3 py-3 text-center">
-                            <StatusIndicator status={getEffectiveStatus(client, month, activeYear)} onClick={() => handleStatusClick(client.id, month)} />
+                            {/* Tratamento visual para "Sem Movimento" */}
+                            {client.sem_movimento ? (
+                              <div className="mx-auto w-6 h-6 flex items-center justify-center rounded-full bg-slate-200 text-slate-400 text-[10px] font-bold" title="Sem Movimento">S/M</div>
+                            ) : (
+                              <StatusIndicator status={getEffectiveStatus(client, month, activeYear)} onClick={() => handleStatusClick(client.id, month)} />
+                            )}
                           </td>
                         ))}
                         <td className="px-4 py-3 text-right">
@@ -333,12 +342,13 @@ export function Dashboard() {
               <div className="flex items-center gap-2"><div className="w-4 h-4 rounded-full bg-amber-400"></div><span>Em Andamento / Pendente</span></div>
               <div className="flex items-center gap-2"><div className="w-4 h-4 rounded-full bg-emerald-500"></div><span>Entregue / Concluído</span></div>
               <div className="flex items-center gap-2"><div className="w-4 h-4 rounded-full bg-red-500"></div><span>Atrasado (Passou do prazo legal)</span></div>
+              <div className="flex items-center gap-2 ml-4 border-l border-slate-300 pl-4"><div className="w-4 h-4 rounded-full bg-slate-200 flex items-center justify-center text-[8px] font-bold text-slate-500">S/M</div><span>Sem Movimento</span></div>
             </div>
           </>
         )}
       </div>
 
-      {/* Modal - MANTIDO EXATAMENTE IGUAL AO SEU ORIGINAL */}
+      {/* Modal de Criação/Edição */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
@@ -354,6 +364,10 @@ export function Dashboard() {
                 <div><label className="block text-sm font-medium text-slate-700 mb-1">Prioridade</label><select required value={formData.prioridade || ''} onChange={(e) => setFormData({...formData, prioridade: e.target.value})} className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none"><option value="">Selecione...</option>{settings.prioridades.map(p => <option key={p} value={p}>{p}</option>)}</select></div>
               </div>
               <div><label className="block text-sm font-medium text-slate-700 mb-1">Tributação</label><select required value={formData.tributacao || ''} onChange={(e) => setFormData({...formData, tributacao: e.target.value})} className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none"><option value="">Selecione...</option>{settings.tributacoes.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
+              <div className="flex items-center gap-2 pt-2 bg-slate-50 p-3 rounded-lg border border-slate-200">
+                <input type="checkbox" id="sem_movimento" checked={formData.sem_movimento || false} onChange={(e) => setFormData({...formData, sem_movimento: e.target.checked})} className="w-4 h-4 text-indigo-600 rounded cursor-pointer" />
+                <label htmlFor="sem_movimento" className="text-sm font-medium text-slate-700 cursor-pointer">Marcar empresa como "Sem Movimento"</label>
+              </div>
               <div className="pt-4 flex justify-end gap-3"><button type="button" onClick={handleCloseModal} className="px-4 py-2 text-slate-600 font-medium hover:bg-slate-100 rounded-lg transition-colors">Cancelar</button><button type="submit" className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors">Salvar</button></div>
             </form>
           </div>
