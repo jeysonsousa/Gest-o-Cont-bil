@@ -171,10 +171,20 @@ export function Pdi() {
     setSaving(true);
     try {
       for (const row of localData) {
+        // CORREÇÃO: Formatação inteligente para datas em branco virarem null
+        const dbRow = {
+          ...row,
+          inicio: row.inicio || null,
+          termino: row.termino || null,
+          prazo_realizado: row.prazo_realizado || null,
+        };
+
         if (row.id) {
-          await supabase.from('pdi_entries').update(row).eq('id', row.id);
+          const { error } = await supabase.from('pdi_entries').update(dbRow).eq('id', row.id);
+          if (error) console.error('Erro no update:', error);
         } else {
-          const { data, error } = await supabase.from('pdi_entries').insert([row]).select();
+          const { data, error } = await supabase.from('pdi_entries').insert([dbRow]).select();
+          if (error) console.error('Erro no insert:', error);
           if (!error && data) {
             row.id = data[0].id;
           }
@@ -326,13 +336,13 @@ export function Pdi() {
                         <input type="text" value={row.competencia} onChange={(e) => handleInputChange(index, 'competencia', e.target.value)} className="w-full p-2 outline-none bg-transparent text-slate-600 text-xs" />
                       </td>
                       <td className="p-1 border-r border-slate-200">
-                        <input type="date" value={row.inicio} onChange={(e) => handleInputChange(index, 'inicio', e.target.value)} className="w-full p-1.5 outline-none bg-white border border-slate-200 rounded text-xs text-slate-600" />
+                        <input type="date" value={row.inicio || ''} onChange={(e) => handleInputChange(index, 'inicio', e.target.value)} className="w-full p-1.5 outline-none bg-white border border-slate-200 rounded text-xs text-slate-600" />
                       </td>
                       <td className="p-1 border-r border-slate-200">
-                        <input type="date" value={row.termino} onChange={(e) => handleInputChange(index, 'termino', e.target.value)} className="w-full p-1.5 outline-none bg-white border border-slate-200 rounded text-xs text-slate-600" />
+                        <input type="date" value={row.termino || ''} onChange={(e) => handleInputChange(index, 'termino', e.target.value)} className="w-full p-1.5 outline-none bg-white border border-slate-200 rounded text-xs text-slate-600" />
                       </td>
                       <td className="p-1 border-r border-slate-200">
-                        <input type="date" value={row.prazo_realizado} onChange={(e) => handleInputChange(index, 'prazo_realizado', e.target.value)} className="w-full p-1.5 outline-none bg-white border border-slate-200 rounded text-xs text-slate-600" />
+                        <input type="date" value={row.prazo_realizado || ''} onChange={(e) => handleInputChange(index, 'prazo_realizado', e.target.value)} className="w-full p-1.5 outline-none bg-white border border-slate-200 rounded text-xs text-slate-600" />
                       </td>
                       <td className="p-1 border-r border-slate-200 text-center">
                         <div className={`mx-auto w-4 h-4 rounded-full ${light.color}`} title={light.title}></div>
