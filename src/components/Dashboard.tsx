@@ -1,13 +1,18 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Client, MONTHS, Status, AppSettings } from '../types';
-import { initialClients, initialSettings } from '../data';
 import { StatusIndicator } from './StatusIndicator';
 import { SettingsPanel } from './SettingsPanel';
 import { Search, Plus, Filter, MoreVertical, Edit2, Trash2, X } from 'lucide-react';
+import { supabase } from '../lib/supabase'; // Ajuste o caminho se necessário
 
 export function Dashboard() {
-  const [clients, setClients] = useState<Client[]>(initialClients);
-  const [settings, setSettings] = useState<AppSettings>(initialSettings);
+  // Estados iniciais vazios, aguardando o Supabase
+  const [clients, setClients] = useState<Client[]>([]);
+  const [settings, setSettings] = useState<AppSettings>({
+    responsaveis: [], atividades: [], prioridades: [], tributacoes: [], empresas: []
+  });
+  const [loading, setLoading] = useState(true);
+
   const [activeTab, setActiveTab] = useState<'dashboard' | 'settings'>('dashboard');
   const [searchTerm, setSearchTerm] = useState('');
   
@@ -27,6 +32,47 @@ export function Dashboard() {
   const currentMonth = MONTHS[new Date().getMonth()] || MONTHS[0];
   const [activeMonth, setActiveMonth] = useState<string>(MONTHS[0]); // Default to first month
 
+  // 1. BUSCAR DADOS DO SUPABASE AO CARREGAR
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        setLoading(true);
+        
+        const { data: clientsData, error: clientsError } = await supabase
+          .from('clients')
+          .select('*')
+          .order('created_at', { ascending: true });
+          
+        if (clientsError) throw clientsError;
+
+        const { data: settingsData, error: settingsError } = await supabase
+          .from('settings')
+          .select('*')
+          .eq('id', 1)
+          .single();
+
+        if (settingsError && settingsError.code !== 'PGRST116') throw settingsError;
+
+        if (clientsData) setClients(clientsData);
+        if (settingsData) {
+          setSettings({
+            responsaveis: settingsData.responsaveis || [],
+            atividades: settingsData.atividades || [],
+            prioridades: settingsData.prioridades || [],
+            tributacoes: settingsData.tributacoes || [],
+            empresas: settingsData.empresas || []
+          });
+        }
+      } catch (error) {
+        console.error('Erro ao buscar dados do Supabase:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchData();
+  }, []);
+
   const metrics = useMemo(() => {
     let total = clients.length;
     let completed = 0;
@@ -43,29 +89,42 @@ export function Dashboard() {
     return { total, completed, pending, delayed };
   }, [clients, activeMonth]);
 
-  const handleStatusClick = (clientId: string, month: string) => {
-    setClients(clients.map(client => {
-      if (client.id === clientId) {
-        const currentStatus = client.status[month] || 'not_started';
-        let nextStatus: Status = 'not_started';
-        
-        switch (currentStatus) {
-          case 'not_started': nextStatus = 'pending'; break;
-          case 'pending': nextStatus = 'completed'; break;
-          case 'completed': nextStatus = 'delayed'; break;
-          case 'delayed': nextStatus = 'not_started'; break;
-        }
+  // 2. ATUALIZAR STATUS NO SUPABASE
+  const handleStatusClick = async (clientId: string, month: string) => {
+    const clientIndex = clients.findIndex(c => c.id === clientId);
+    if (clientIndex === -1) return;
+    
+    const client = clients[clientIndex];
+    const currentStatus = client.status[month] || 'not_started';
+    let nextStatus: Status = 'not_started';
+    
+    switch (currentStatus) {
+      case 'not_started': nextStatus = 'pending'; break;
+      case 'pending': nextStatus = 'completed'; break;
+      case 'completed': nextStatus = 'delayed'; break;
+      case 'delayed': nextStatus = 'not_started'; break;
+    }
 
-        return {
-          ...client,
-          status: {
-            ...client.status,
-            [month]: nextStatus
-          }
-        };
-      }
-      return client;
-    }));
+    const newStatusObj = {
+      ...client.status,
+      [month]: nextStatus
+    };
+
+    // Atualização otimista na tela (antes mesmo do banco responder)
+    setClients(clients.map(c => 
+      c.id === clientId ? { ...c, status: newStatusObj } : c
+    ));
+
+    // Salvar no banco
+    const { error } = await supabase
+      .from('clients')
+      .update({ status: newStatusObj })
+      .eq('id', clientId);
+
+    if (error) {
+      console.error('Erro ao atualizar status:', error);
+      alert('Erro ao salvar o status no banco de dados.');
+    }
   };
 
   const filteredClients = useMemo(() => {
@@ -104,26 +163,92 @@ export function Dashboard() {
     setFormData({});
   };
 
-  const handleSaveClient = (e: React.FormEvent) => {
+  // 3. INSERIR E EDITAR NO SUPABASE
+  const handleSaveClient = async (e: React.FormEvent) => {
     e.preventDefault();
+    
     if (editingClient) {
-      setClients(clients.map(c => c.id === editingClient.id ? { ...c, ...formData } as Client : c));
+      // Editar
+      const { error } = await supabase
+        .from('clients')
+        .update({
+          responsavel: formData.responsavel,
+          empresa: formData.empresa,
+          atividade: formData.atividade,
+          prioridade: formData.prioridade,
+          tributacao: formData.tributacao
+        })
+        .eq('id', editingClient.id);
+
+      if (!error) {
+        setClients(clients.map(c => c.id === editingClient.id ? { ...c, ...formData } as Client : c));
+      } else {
+        alert('Erro ao editar cliente.');
+      }
     } else {
-      const newClient: Client = {
-        ...(formData as Client),
-        id: Math.random().toString(36).substr(2, 9),
+      // Criar Novo
+      const newClientData = {
+        responsavel: formData.responsavel,
+        empresa: formData.empresa,
+        atividade: formData.atividade,
+        prioridade: formData.prioridade,
+        tributacao: formData.tributacao,
         status: {}
       };
-      setClients([...clients, newClient]);
+
+      const { data, error } = await supabase
+        .from('clients')
+        .insert([newClientData])
+        .select();
+
+      if (!error && data) {
+        setClients([...clients, data[0] as Client]);
+      } else {
+        alert('Erro ao criar cliente.');
+      }
     }
     handleCloseModal();
   };
 
-  const handleDeleteClient = (id: string) => {
+  // 4. EXCLUIR DO SUPABASE
+  const handleDeleteClient = async (id: string) => {
     if (window.confirm('Tem certeza que deseja excluir este cliente?')) {
-      setClients(clients.filter(c => c.id !== id));
+      const { error } = await supabase
+        .from('clients')
+        .delete()
+        .eq('id', id);
+
+      if (!error) {
+        setClients(clients.filter(c => c.id !== id));
+      } else {
+        alert('Erro ao excluir cliente.');
+      }
     }
   };
+
+  // 5. ATUALIZAR CONFIGURAÇÕES GERAIS NO SUPABASE
+  const handleUpdateSettings = async (newSettings: AppSettings) => {
+    setSettings(newSettings); // Atualiza a tela primeiro
+    
+    const { error } = await supabase
+      .from('settings')
+      .update({
+        responsaveis: newSettings.responsaveis,
+        atividades: newSettings.atividades,
+        prioridades: newSettings.prioridades,
+        tributacoes: newSettings.tributacoes,
+        empresas: newSettings.empresas
+      })
+      .eq('id', 1);
+
+    if (error) {
+      console.error('Erro ao salvar configurações:', error);
+    }
+  };
+
+  if (loading) {
+    return <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-600 font-medium">Carregando painel de gestão...</div>;
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 p-6">
@@ -174,7 +299,7 @@ export function Dashboard() {
         </div>
 
         {activeTab === 'settings' ? (
-          <SettingsPanel settings={settings} setSettings={setSettings} />
+          <SettingsPanel settings={settings} setSettings={handleUpdateSettings} />
         ) : (
           <>
             {/* Metrics */}
