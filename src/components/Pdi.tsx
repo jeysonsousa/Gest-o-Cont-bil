@@ -17,25 +17,43 @@ export function Pdi() {
   const [activeYear, setActiveYear] = useState<string>(currentYearNum.toString());
   const [activeResponsavel, setActiveResponsavel] = useState<string>('');
 
+  // Analistas Dinâmicos (Só mostra quem tem cliente ativo)
+  const [activeAnalysts, setActiveAnalysts] = useState<string[]>([]);
+
   // Dados
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [localData, setLocalData] = useState<PdiEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  // 1. Carregar Configurações e Analistas Dinamicamente
   useEffect(() => {
-    async function fetchSettings() {
-      const { data } = await supabase.from('settings').select('*').eq('id', 1).single();
-      if (data) {
-        setSettings(data);
-        if (data.responsaveis && data.responsaveis.length > 0) {
-          setActiveResponsavel(data.responsaveis[0]);
+    async function fetchData() {
+      // Busca as configurações (mantido para compatibilidade, se necessário no futuro)
+      const { data: settingsData } = await supabase.from('settings').select('*').eq('id', 1).single();
+      if (settingsData) {
+        setSettings(settingsData);
+      }
+
+      // Busca todos os clientes para extrair a lista real de responsáveis ativos
+      const { data: clientsData } = await supabase.from('clients').select('responsavel, is_inactive, sem_movimento');
+      if (clientsData) {
+        // Filtra ignorando ex-clientes (is_inactive)
+        const list = clientsData.filter(c => !c.is_inactive).map(c => c.responsavel);
+        const uniqueAnalysts = [...new Set(list)].sort();
+        
+        setActiveAnalysts(uniqueAnalysts);
+        
+        // Se ainda não tem responsável selecionado e a lista não for vazia, seleciona o primeiro
+        if (uniqueAnalysts.length > 0 && !activeResponsavel) {
+          setActiveResponsavel(uniqueAnalysts[0]);
         }
       }
     }
-    fetchSettings();
-  }, []);
+    fetchData();
+  }, [activeResponsavel]);
 
+  // 2. Carregar Dados do PDI Cruzados com Clientes
   useEffect(() => {
     async function fetchPdiData() {
       if (!activeResponsavel) return;
@@ -58,8 +76,8 @@ export function Pdi() {
         const dbEntries = pdiData || [];
         const combined: PdiEntry[] = [...dbEntries];
 
-        // FILTRO INTELIGENTE: Ignora empresas sem movimento para não poluir o PDI
-        const activeClients = clients.filter((c: Client) => !c.sem_movimento);
+        // FILTRO INTELIGENTE: Ignora empresas "Sem movimento" e "Ex-clientes (Inativos)"
+        const activeClients = clients.filter((c: Client) => !c.sem_movimento && !c.is_inactive);
 
         activeClients.forEach((client: Client) => {
           const exists = dbEntries.find(e => e.empresa === client.empresa && !e.is_extra);
@@ -236,11 +254,11 @@ export function Pdi() {
             onChange={(e) => setActiveResponsavel(e.target.value)}
             className="bg-white border border-slate-200 px-3 py-2 rounded-lg text-sm font-medium focus:outline-none focus:border-indigo-500"
           >
-            {settings?.responsaveis?.map(r => <option key={r} value={r}>{r}</option>)}
+            {activeAnalysts.map(r => <option key={r} value={r}>{r}</option>)}
           </select>
           <div className="h-6 w-px bg-slate-300"></div>
-          <select value={activeMonth} onChange={(e) => setActiveMonth(e.target.value)} className="bg-transparent text-sm font-bold text-slate-800 focus:outline-none cursor-pointer">
-            {MONTHS.map(m => <option key={m} value={m}>{m.toUpperCase()}</option>)}
+          <select value={activeMonth} onChange={(e) => setActiveMonth(e.target.value)} className="bg-transparent text-sm font-bold text-slate-800 focus:outline-none cursor-pointer uppercase">
+            {MONTHS.map(m => <option key={m} value={m}>{m}</option>)}
           </select>
           <span className="text-slate-400">/</span>
           <select value={activeYear} onChange={(e) => setActiveYear(e.target.value)} className="bg-transparent text-sm font-bold text-slate-800 focus:outline-none cursor-pointer">
