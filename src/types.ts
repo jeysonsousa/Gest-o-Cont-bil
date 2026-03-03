@@ -46,6 +46,7 @@ export interface PdiEntry {
   inicio: string;
   termino: string;
   prazo_realizado: string;
+  meio_expediente?: boolean; // SOLICITAÇÃO: Flag para indicar meio expediente (-0.5 dia)
   percentual: number;
   status: string;
   observacao: string;
