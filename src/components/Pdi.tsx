@@ -87,6 +87,7 @@ export function Pdi() {
               inicio: '',
               termino: '',
               prazo_realizado: '',
+              meio_expediente: false, // Inicia a flag como false
               percentual: 0, 
               status: 'n',
               observacao: '',
@@ -117,7 +118,7 @@ export function Pdi() {
     return { avg, total, completed };
   }, [localData]);
 
-  const handleInputChange = (index: number, field: keyof PdiEntry, value: string | number) => {
+  const handleInputChange = (index: number, field: keyof PdiEntry, value: string | number | boolean) => {
     const newData = [...localData];
     newData[index] = { ...newData[index], [field]: value };
     setLocalData(newData);
@@ -132,6 +133,7 @@ export function Pdi() {
       inicio: '',
       termino: '',
       prazo_realizado: '',
+      meio_expediente: false,
       percentual: 0,
       status: 'n',
       observacao: '',
@@ -190,6 +192,7 @@ export function Pdi() {
           inicio: row.inicio || null,
           termino: row.termino || null,
           prazo_realizado: row.prazo_realizado || null,
+          meio_expediente: row.meio_expediente || false // Salva a nova flag
         };
 
         if (row.id) {
@@ -375,8 +378,14 @@ export function Pdi() {
                       <td className="p-1 border-r border-slate-200">
                         <input type="date" value={row.termino || ''} onChange={(e) => handleInputChange(index, 'termino', e.target.value)} className="w-full p-1.5 outline-none bg-white border border-slate-200 rounded text-xs text-slate-600" />
                       </td>
-                      <td className="p-1 border-r border-slate-200">
-                        <input type="date" value={row.prazo_realizado || ''} onChange={(e) => handleInputChange(index, 'prazo_realizado', e.target.value)} className="w-full p-1.5 outline-none bg-white border border-slate-200 rounded text-xs text-slate-600" />
+                      <td className="p-1 border-r border-slate-200 bg-slate-50/50">
+                        <div className="flex flex-col gap-1 items-center">
+                          <input type="date" value={row.prazo_realizado || ''} onChange={(e) => handleInputChange(index, 'prazo_realizado', e.target.value)} className="w-full p-1.5 outline-none bg-white border border-slate-200 rounded text-xs text-slate-600" />
+                          <label className="flex items-center gap-1 cursor-pointer hover:bg-slate-200 px-1.5 rounded transition-colors" title="Marque se utilizou apenas meio expediente">
+                            <input type="checkbox" checked={row.meio_expediente || false} onChange={(e) => handleInputChange(index, 'meio_expediente', e.target.checked)} className="w-3 h-3 text-indigo-600 rounded border-slate-300" />
+                            <span className="text-[9px] font-bold text-slate-500 uppercase">-0,5 DIA</span>
+                          </label>
+                        </div>
                       </td>
                       <td className="p-1 border-r border-slate-200 text-center">
                         <div className={`mx-auto w-4 h-4 rounded-full ${light.color} shadow-inner`} title={light.title}></div>
