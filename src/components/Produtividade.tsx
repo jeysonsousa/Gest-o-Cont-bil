@@ -1,3 +1,8 @@
+/**
+ * @developer Jeyson Lins
+ * @contact jeyson.cont@gmail.com | 91983617032
+ */
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../supabase';
 import { Client, PdiEntry, MONTHS } from '../types';
@@ -56,10 +61,12 @@ export function Produtividade() {
           .map(entry => {
             const client = clients.find(c => c.empresa === entry.empresa);
             const estimado = client?.tempo_estimado || 0;
-            const realizado = getBusinessDays(entry.inicio, entry.prazo_realizado);
+            
+            // LÓGICA ATUALIZADA: Dias Úteis Brutos - 0.5 se a flag estiver marcada
+            const diasBrutos = getBusinessDays(entry.inicio, entry.prazo_realizado);
+            let realizado = entry.meio_expediente ? Math.max(0.5, diasBrutos - 0.5) : diasBrutos;
             
             // Cálculo de Eficiência: (Estimado / Realizado) * 100
-            // Se estimado é 2 e fez em 1 -> 200% (Ótimo). Se estimado é 1 e fez em 2 -> 50% (Ruim).
             let eficiencia = 0;
             if (estimado > 0 && realizado > 0) eficiencia = (estimado / realizado) * 100;
             else if (estimado > 0 && realizado === 0) eficiencia = 100; // Fez no mesmo dia (menos de 1 dia)
@@ -69,6 +76,7 @@ export function Produtividade() {
               atividade: entry.atividade,
               inicio: entry.inicio,
               fim: entry.prazo_realizado,
+              meioExp: entry.meio_expediente,
               estimado,
               realizado,
               eficiencia: Math.round(eficiencia)
@@ -152,19 +160,24 @@ export function Produtividade() {
                   <th className="px-6 py-4">Empresa</th>
                   <th className="px-6 py-4 text-center">Data Início</th>
                   <th className="px-6 py-4 text-center">Data Conclusão</th>
-                  <th className="px-6 py-4 text-center">Estimado (Dias)</th>
-                  <th className="px-6 py-4 text-center">Realizado (Úteis)</th>
+                  <th className="px-6 py-4 text-center">Estimado</th>
+                  <th className="px-6 py-4 text-center">Realizado</th>
                   <th className="px-6 py-4 text-right">Eficiência</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {performanceData.map((row, idx) => (
                   <tr key={idx} className="hover:bg-slate-50 transition-colors group">
-                    <td className="px-6 py-4 font-bold text-slate-800">{row.empresa}</td>
+                    <td className="px-6 py-4 font-bold text-slate-800">
+                      <div className="flex flex-col">
+                        <span>{row.empresa}</span>
+                        {row.meioExp && <span className="text-[10px] text-indigo-500 uppercase">Utilizou Meio Expediente (-0,5d)</span>}
+                      </div>
+                    </td>
                     <td className="px-6 py-4 text-center text-slate-600">{row.inicio.split('-').reverse().join('/')}</td>
                     <td className="px-6 py-4 text-center text-slate-600">{row.fim.split('-').reverse().join('/')}</td>
-                    <td className="px-6 py-4 text-center font-bold text-indigo-600">{row.estimado === 0 ? 'Não def.' : row.estimado}</td>
-                    <td className="px-6 py-4 text-center font-bold text-slate-700">{row.realizado}</td>
+                    <td className="px-6 py-4 text-center font-bold text-slate-600">{row.estimado === 0 ? '-' : `${row.estimado}d`}</td>
+                    <td className="px-6 py-4 text-center font-bold text-indigo-600">{row.realizado}d</td>
                     <td className="px-6 py-4 text-right">
                       {row.estimado === 0 ? (
                         <span className="text-slate-400 text-xs font-medium">Sem parâmetro</span>
