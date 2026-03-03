@@ -17,6 +17,7 @@ export interface Client {
   empresa: string;
   sem_movimento?: boolean;
   is_inactive?: boolean; // SOLICITAÇÃO: Flag para empresas que deixaram de ser clientes
+  tempo_estimado?: number; // SOLICITAÇÃO: Tempo estimado em dias para conclusão (ex: 0.5, 1, 2)
   atividade: string;
   prioridade: string;
   tributacao: string;
