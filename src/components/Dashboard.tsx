@@ -157,9 +157,8 @@ export function Dashboard() {
     return result;
   }, [clients, searchTerm, filterResponsavel, filterAtividade, filterPrioridade, filterTributacao, sortConfig, showInactive]);
 
-  // Função de Exportação para CSV Formadado (Excel Brasil)
   const handleExportCSV = () => {
-    const headers = ['Responsável', 'Empresa', 'Atividade', 'Prioridade', 'Tributação', 'Status Empresa'];
+    const headers = ['Responsável', 'Empresa', 'Atividade', 'Prioridade', 'Tributação', 'Tempo Est. (Dias)', 'Status Empresa'];
     
     const rows = filteredAndSortedClients.map(c => {
       let statusEmpresa = 'Ativa';
@@ -172,17 +171,16 @@ export function Dashboard() {
         c.atividade || '',
         c.prioridade || '',
         c.tributacao || '',
+        c.tempo_estimado?.toString() || '0',
         statusEmpresa
       ];
     });
 
-    // Ponto e vírgula é crucial para o Excel abrir as colunas certas no Brasil
     const csvContent = [
       headers.join(';'),
       ...rows.map(row => row.map(cell => `"${cell}"`).join(';'))
     ].join('\n');
 
-    // BOM (\uFEFF) para garantir que acentos fiquem corretos
     const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -200,7 +198,7 @@ export function Dashboard() {
       setFormData(client);
     } else {
       setEditingClient(null);
-      setFormData({ responsavel: '', empresa: '', atividade: '', prioridade: 'A', tributacao: '', sem_movimento: false, is_inactive: false, status: {} });
+      setFormData({ responsavel: '', empresa: '', atividade: '', prioridade: 'A', tributacao: '', sem_movimento: false, is_inactive: false, tempo_estimado: 0, status: {} });
     }
     setIsModalOpen(true);
   };
@@ -441,12 +439,28 @@ export function Dashboard() {
                   </select>
                 </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Tributação</label>
-                <select required value={formData.tributacao || ''} onChange={(e) => setFormData({...formData, tributacao: e.target.value})} className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none">
-                  <option value="">Selecione...</option>
-                  {settings.tributacoes.map(t => <option key={t} value={t}>{t}</option>)}
-                </select>
+              
+              {/* NOVA LINHA: Tributação e Tempo Estimado Lado a Lado */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Tributação</label>
+                  <select required value={formData.tributacao || ''} onChange={(e) => setFormData({...formData, tributacao: e.target.value})} className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none">
+                    <option value="">Selecione...</option>
+                    {settings.tributacoes.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Tempo Est. (Dias)</label>
+                  <input 
+                    type="number" 
+                    step="0.5" 
+                    min="0" 
+                    value={formData.tempo_estimado || ''} 
+                    onChange={(e) => setFormData({...formData, tempo_estimado: parseFloat(e.target.value) || 0})} 
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none"
+                    placeholder="Ex: 1.5"
+                  />
+                </div>
               </div>
               
               <div className="flex flex-col gap-2 pt-2">
