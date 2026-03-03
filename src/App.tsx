@@ -6,16 +6,18 @@
 import React, { useState } from 'react';
 import { Dashboard } from './components/Dashboard';
 import { Pdi } from './components/Pdi';
+import { Produtividade } from './components/Produtividade';
 import { 
   LayoutDashboard, 
   Target, 
   ChevronLeft, 
   ChevronRight, 
-  Menu 
+  Menu,
+  Activity
 } from 'lucide-react';
 
 export default function App() {
-  const [currentRoute, setCurrentRoute] = useState<'dashboard' | 'pdi'>('dashboard');
+  const [currentRoute, setCurrentRoute] = useState<'dashboard' | 'pdi' | 'produtividade'>('dashboard');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   return (
@@ -74,6 +76,19 @@ export default function App() {
             <Target size={22} className={currentRoute === 'pdi' ? 'text-indigo-600' : ''} />
             {!isSidebarCollapsed && <span className="text-sm whitespace-nowrap">PDI da Equipe</span>}
           </button>
+
+          <button
+            onClick={() => setCurrentRoute('produtividade')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${
+              currentRoute === 'produtividade' 
+                ? 'bg-indigo-50 text-indigo-700 shadow-sm' 
+                : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
+            } ${isSidebarCollapsed ? 'justify-center px-0' : ''}`}
+            title="Produtividade Real"
+          >
+            <Activity size={22} className={currentRoute === 'produtividade' ? 'text-indigo-600' : ''} />
+            {!isSidebarCollapsed && <span className="text-sm whitespace-nowrap">Produtividade</span>}
+          </button>
         </nav>
 
         {/* Rodapé da Sidebar (Opcional) */}
@@ -90,8 +105,10 @@ export default function App() {
       <div className="flex-1 overflow-auto bg-slate-50">
         {currentRoute === 'dashboard' ? (
           <Dashboard />
-        ) : (
+        ) : currentRoute === 'pdi' ? (
           <Pdi />
+        ) : (
+          <Produtividade />
         )}
       </div>
     </div>
