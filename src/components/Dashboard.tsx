@@ -7,7 +7,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Client, MONTHS, Status, AppSettings, StatusRecord } from '../types';
 import { StatusIndicator } from './StatusIndicator';
 import { SettingsPanel } from './SettingsPanel';
-import { Search, Plus, ArrowUpDown, Edit2, Trash2, X, UserCheck, EyeOff } from 'lucide-react';
+import { Search, Plus, ArrowUpDown, Edit2, Trash2, X, UserCheck, EyeOff, Download } from 'lucide-react';
 import { supabase } from '../supabase';
 
 const currentYearNum = new Date().getFullYear();
@@ -63,7 +63,6 @@ export function Dashboard() {
     const data = client.status[key];
     if (data && typeof data === 'object') {
       const record = data as StatusRecord;
-      // Calcula atraso dinamicamente
       if (record.val !== 'completed') {
         const monthIndex = MONTHS.indexOf(monthName);
         const targetYear = parseInt(year);
@@ -74,7 +73,6 @@ export function Dashboard() {
       return record;
     }
     
-    // Tratamento para dados antigos
     let val = (data as Status) || 'not_started';
     if (val !== 'completed') {
       const monthIndex = MONTHS.indexOf(monthName);
@@ -159,6 +157,43 @@ export function Dashboard() {
     return result;
   }, [clients, searchTerm, filterResponsavel, filterAtividade, filterPrioridade, filterTributacao, sortConfig, showInactive]);
 
+  // Função de Exportação para CSV Formadado (Excel Brasil)
+  const handleExportCSV = () => {
+    const headers = ['Responsável', 'Empresa', 'Atividade', 'Prioridade', 'Tributação', 'Status Empresa'];
+    
+    const rows = filteredAndSortedClients.map(c => {
+      let statusEmpresa = 'Ativa';
+      if (c.is_inactive) statusEmpresa = 'Inativa (Ex-cliente)';
+      else if (c.sem_movimento) statusEmpresa = 'Sem Movimento';
+
+      return [
+        c.responsavel || '',
+        c.empresa || '',
+        c.atividade || '',
+        c.prioridade || '',
+        c.tributacao || '',
+        statusEmpresa
+      ];
+    });
+
+    // Ponto e vírgula é crucial para o Excel abrir as colunas certas no Brasil
+    const csvContent = [
+      headers.join(';'),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(';'))
+    ].join('\n');
+
+    // BOM (\uFEFF) para garantir que acentos fiquem corretos
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    const dateStr = new Date().toISOString().split('T')[0];
+    link.setAttribute('download', `base_clientes_${dateStr}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const handleOpenModal = (client?: Client) => {
     if (client) {
       setEditingClient(client);
@@ -212,7 +247,14 @@ export function Dashboard() {
               <button onClick={() => setActiveTab('settings')} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'settings' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Configurações</button>
             </div>
             {activeTab === 'dashboard' && (
-              <button onClick={() => handleOpenModal()} className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"><Plus size={18} /> Novo Cliente</button>
+              <div className="flex items-center gap-2">
+                <button onClick={handleExportCSV} className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-lg font-medium transition-colors shadow-sm" title="Exportar dados cadastrais">
+                  <Download size={18} /> Exportar
+                </button>
+                <button onClick={() => handleOpenModal()} className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-sm">
+                  <Plus size={18} /> Novo Cliente
+                </button>
+              </div>
             )}
           </div>
         </div>
@@ -238,7 +280,7 @@ export function Dashboard() {
               </div>
               <div className="flex flex-wrap gap-3 items-center">
                 <select value={filterResponsavel} onChange={(e) => setFilterResponsavel(e.target.value)} className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none">
-                  <option value="">Todos Responsáveis</option>
+                  <option value="">Responsável</option>
                   {activeAnalysts.map(r => <option key={r} value={r}>{r}</option>)}
                 </select>
                 <select value={filterAtividade} onChange={(e) => setFilterAtividade(e.target.value)} className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none">
@@ -356,7 +398,7 @@ export function Dashboard() {
         )}
       </div>
 
-      {/* Modal - Restaurado para o HTML Original com a adição da inativação */}
+      {/* Modal de Edição */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
@@ -372,7 +414,7 @@ export function Dashboard() {
                   required 
                   value={formData.empresa || ''} 
                   onChange={(e) => setFormData({...formData, empresa: e.target.value.toUpperCase()})} 
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none" 
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none uppercase font-bold" 
                   placeholder="Nome da Empresa"
                 />
               </div>
@@ -420,7 +462,7 @@ export function Dashboard() {
 
               <div className="pt-4 flex justify-end gap-3">
                 <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-slate-600 font-medium hover:bg-slate-100 rounded-lg transition-colors">Cancelar</button>
-                <button type="submit" className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors">Salvar</button>
+                <button type="submit" className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors">Salvar Alterações</button>
               </div>
             </form>
           </div>
