@@ -11,7 +11,6 @@ import { Save, Plus, Trash2, Target, Check, CheckCheck, Search, ShieldAlert, Pie
 const currentYearNum = new Date().getFullYear();
 const YEARS = Array.from({ length: 5 }, (_, i) => (currentYearNum - 1 + i).toString());
 
-// Lógica de Competência Contábil (Mês Anterior)
 const currentDate = new Date();
 let defaultMonthIndex = currentDate.getMonth() - 1;
 let defaultYearNum = currentDate.getFullYear();
@@ -244,7 +243,7 @@ export function Pdi() {
       <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <Target className="text-indigo-800" /> PDI da Equipe - TESTE
+            <Target className="text-[#1e3a8a]" /> PDI da Equipe
           </h1>
           <p className="text-slate-500 text-sm mt-1">Plano de Ação e Desempenho Mensal</p>
         </div>
@@ -254,7 +253,7 @@ export function Pdi() {
             value={activeResponsavel} 
             onChange={(e) => setActiveResponsavel(e.target.value)}
             disabled={!isAdmin} 
-            className={`border border-slate-200 px-3 py-2 rounded-lg text-sm font-medium focus:outline-none min-w-[150px] ${!isAdmin ? 'bg-slate-100 cursor-not-allowed text-slate-500' : 'bg-white focus:border-indigo-600'}`}
+            className={`border border-slate-200 px-3 py-2 rounded-lg text-sm font-medium focus:outline-none min-w-[150px] ${!isAdmin ? 'bg-slate-100 cursor-not-allowed text-slate-500' : 'bg-white focus:border-[#2563eb]'}`}
           >
             {activeAnalysts.map(r => <option key={r} value={r}>{r}</option>)}
           </select>
@@ -277,7 +276,7 @@ export function Pdi() {
           
           <div className="mt-6 bg-white p-4 rounded-xl border border-amber-100 text-left">
             <p className="text-xs font-bold text-slate-500 uppercase tracking-widest border-b border-slate-100 pb-2 mb-3">Diagnóstico do Sistema</p>
-            <p className="text-sm text-slate-700"><strong>Seu E-mail de login:</strong> <span className="text-indigo-600">{userEmail}</span></p>
+            <p className="text-sm text-slate-700"><strong>Seu E-mail de login:</strong> <span className="text-[#2563eb]">{userEmail}</span></p>
             <p className="text-sm text-slate-700 mt-2"><strong>Analistas cadastrados pelo Admin:</strong> {debugUsuarios.length}</p>
             {debugUsuarios.length > 0 && (
               <ul className="mt-2 space-y-1">
@@ -294,8 +293,8 @@ export function Pdi() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex">
               
-              {/* Degradê Azul VSM (ÍNDIGO) */}
-              <div className="bg-gradient-to-br from-indigo-700 to-indigo-900 text-white p-6 w-48 flex flex-col items-center justify-center text-center shadow-inner">
+              {/* O Card com Gradiente Absoluto: Azul Profundo VSM garantido */}
+              <div className="bg-gradient-to-br from-[#1e3a8a] to-[#0f172a] text-white p-6 w-48 flex flex-col items-center justify-center text-center shadow-inner">
                 <PieChart size={32} className="mb-2 opacity-80" />
                 <span className="font-bold text-sm uppercase tracking-wider">Evolução<br/>Mensal</span>
               </div>
@@ -318,8 +317,7 @@ export function Pdi() {
             </div>
 
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
-              {/* Título restaurado para ÍNDIGO */}
-              <div className="bg-slate-100 text-indigo-900 font-black p-3 text-center text-sm border-b border-slate-200">
+              <div className="bg-slate-100 text-[#0f172a] font-black p-3 text-center text-sm border-b border-slate-200">
                 ANÁLISE DE DESEMPENHO
               </div>
               <div className="p-6 flex-1 flex flex-col justify-center gap-4">
@@ -346,13 +344,12 @@ export function Pdi() {
               <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
                 <div className="relative flex-1 min-w-[200px]">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                  <input type="text" placeholder="Buscar empresa ou ação..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"/>
+                  <input type="text" placeholder="Buscar empresa ou ação..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20 transition-all"/>
                 </div>
 
                 <button onClick={handleAddExtra} className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-600 bg-slate-50 border border-slate-200 hover:bg-slate-100 rounded-lg transition-colors">
                   <Plus size={16} /> Adicionar Extra
                 </button>
-                {/* Botão de Salvar Verde Esmeralda */}
                 <button onClick={handleSave} disabled={saving} className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors disabled:opacity-50 shadow-sm">
                   <Save size={16} /> {saving ? 'Salvando...' : 'Salvar PDI'}
                 </button>
@@ -385,17 +382,17 @@ export function Pdi() {
                         <tr key={index} className={row.is_extra ? 'bg-slate-50/50' : 'hover:bg-slate-50'}>
                           <td className="p-1 border-r border-slate-200"><input type="text" value={row.empresa} onChange={(e) => handleInputChange(index, 'empresa', e.target.value)} disabled={!row.is_extra} className={`w-full p-2 outline-none uppercase font-bold text-xs ${!row.is_extra ? 'bg-transparent text-slate-700' : 'bg-white border border-slate-300 rounded'}`} placeholder="NOME DA EMPRESA" /></td>
                           
-                          {/* Texto da Ação na cor ÍNDIGO VSM */}
-                          <td className="p-1 border-r border-slate-200"><input type="text" value={row.atividade} onChange={(e) => handleInputChange(index, 'atividade', e.target.value)} className="w-full p-2 outline-none bg-transparent text-indigo-700 font-bold text-xs" placeholder="Qual a ação?" /></td>
+                          {/* Texto da Ação na cor Absoluta Azul */}
+                          <td className="p-1 border-r border-slate-200"><input type="text" value={row.atividade} onChange={(e) => handleInputChange(index, 'atividade', e.target.value)} className="w-full p-2 outline-none bg-transparent text-[#1e3a8a] font-bold text-xs" placeholder="Qual a ação?" /></td>
                           
                           <td className="p-1 border-r border-slate-200 text-center"><input type="text" value={row.competencia} onChange={(e) => handleInputChange(index, 'competencia', e.target.value)} className="w-full p-2 outline-none bg-transparent text-slate-500 text-xs text-center" /></td>
-                          <td className="p-1 border-r border-slate-200"><input type="date" value={row.inicio || ''} onChange={(e) => handleInputChange(index, 'inicio', e.target.value)} className="w-full p-1.5 outline-none bg-white border border-slate-200 rounded text-xs text-slate-600 focus:ring-1 focus:ring-indigo-500/20" /></td>
-                          <td className="p-1 border-r border-slate-200"><input type="date" value={row.termino || ''} onChange={(e) => handleInputChange(index, 'termino', e.target.value)} className="w-full p-1.5 outline-none bg-white border border-slate-200 rounded text-xs text-slate-600 focus:ring-1 focus:ring-indigo-500/20" /></td>
+                          <td className="p-1 border-r border-slate-200"><input type="date" value={row.inicio || ''} onChange={(e) => handleInputChange(index, 'inicio', e.target.value)} className="w-full p-1.5 outline-none bg-white border border-slate-200 rounded text-xs text-slate-600 focus:ring-1 focus:ring-[#2563eb]/20" /></td>
+                          <td className="p-1 border-r border-slate-200"><input type="date" value={row.termino || ''} onChange={(e) => handleInputChange(index, 'termino', e.target.value)} className="w-full p-1.5 outline-none bg-white border border-slate-200 rounded text-xs text-slate-600 focus:ring-1 focus:ring-[#2563eb]/20" /></td>
                           <td className="p-1 border-r border-slate-200 bg-slate-50/50">
                             <div className="flex flex-col gap-1 items-center">
-                              <input type="date" value={row.prazo_realizado || ''} onChange={(e) => handleInputChange(index, 'prazo_realizado', e.target.value)} className="w-full p-1.5 outline-none bg-white border border-slate-200 rounded text-xs text-slate-600 focus:ring-1 focus:ring-indigo-500/20" />
+                              <input type="date" value={row.prazo_realizado || ''} onChange={(e) => handleInputChange(index, 'prazo_realizado', e.target.value)} className="w-full p-1.5 outline-none bg-white border border-slate-200 rounded text-xs text-slate-600 focus:ring-1 focus:ring-[#2563eb]/20" />
                               <label className="flex items-center gap-1 cursor-pointer hover:bg-slate-200 px-1.5 rounded transition-colors" title="Marque se utilizou apenas meio expediente">
-                                <input type="checkbox" checked={row.meio_expediente || false} onChange={(e) => handleInputChange(index, 'meio_expediente', e.target.checked)} className="w-3 h-3 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500" />
+                                <input type="checkbox" checked={row.meio_expediente || false} onChange={(e) => handleInputChange(index, 'meio_expediente', e.target.checked)} className="w-3 h-3 text-[#2563eb] rounded border-slate-300 focus:ring-[#2563eb]" />
                                 <span className="text-[9px] font-bold text-slate-500 uppercase">-0,5 DIA</span>
                               </label>
                             </div>
@@ -404,8 +401,8 @@ export function Pdi() {
                           <td className="p-1 border-r border-slate-200"><input type="text" value={row.observacao} onChange={(e) => handleInputChange(index, 'observacao', e.target.value)} className="w-full p-2 outline-none bg-transparent text-xs text-slate-600" placeholder="Insira uma nota..." /></td>
                           <td className="p-1 text-center">
                             <div className="flex items-center justify-center gap-2">
-                              {/* Botões de validação com fundo ÍNDIGO E ESMERALDA */}
-                              <button onClick={() => handleAnalystConfirm(index)} className={`p-1.5 rounded-md transition-colors ${row.status === 'analyst' || row.status === 'ok' ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`} title={row.status === 'n' ? "Finalizar Tarefa (Analista)" : "Tarefa Finalizada"}><Check size={16} /></button>
+                              {/* Botões usando Hex Azul */}
+                              <button onClick={() => handleAnalystConfirm(index)} className={`p-1.5 rounded-md transition-colors ${row.status === 'analyst' || row.status === 'ok' ? 'bg-[#dbeafe] text-[#2563eb]' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`} title={row.status === 'n' ? "Finalizar Tarefa (Analista)" : "Tarefa Finalizada"}><Check size={16} /></button>
                               <button onClick={() => handleManagerConfirm(index)} disabled={row.status === 'n' || !isAdmin} className={`p-1.5 rounded-md transition-colors ${row.status === 'ok' ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'} disabled:opacity-30 disabled:cursor-not-allowed`} title={row.status === 'ok' ? "Validado pelo Gestor" : isAdmin ? "Validar (Gestor)" : "Apenas o Gestor pode validar"}><CheckCheck size={16} /></button>
                               {row.is_extra && <button onClick={() => handleDeleteExtra(index)} className="p-1.5 text-red-500 hover:bg-red-50 rounded" title="Excluir Extra"><Trash2 size={16} /></button>}
                             </div>
