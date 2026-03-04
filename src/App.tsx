@@ -61,13 +61,13 @@ export default function App() {
       <div className={`${isSidebarCollapsed ? 'w-20' : 'w-64'} bg-white border-r border-slate-200 flex flex-col shadow-sm z-50 transition-all duration-300 ease-in-out relative`}>
         <button 
           onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-          className="absolute -right-3 top-10 bg-white border border-slate-200 rounded-full p-1 text-slate-400 hover:text-indigo-600 shadow-sm z-50 transition-colors"
+          className="absolute -right-3 top-10 bg-white border border-slate-200 rounded-full p-1 text-slate-400 hover:text-[#2563eb] shadow-sm z-50 transition-colors"
           title={isSidebarCollapsed ? "Expandir menu" : "Recolher menu"}
         >
           {isSidebarCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
         </button>
 
-        {/* HEADER DA SIDEBAR COM A LOGO OFICIAL E O TÍTULO */}
+        {/* HEADER DA SIDEBAR COM A LOGO OFICIAL */}
         <div className={`p-6 border-b border-slate-100 flex flex-col items-center justify-center min-h-[120px] transition-all ${isSidebarCollapsed ? 'p-2 min-h-[80px]' : ''}`}>
           {!isSidebarCollapsed ? (
             <>
@@ -87,19 +87,19 @@ export default function App() {
         </div>
         
         <nav className="flex-1 p-4 space-y-2">
-          {/* Menus restaurados para o padrão ÍNDIGO da VSM */}
-          <button onClick={() => setCurrentRoute('dashboard')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${currentRoute === 'dashboard' ? 'bg-indigo-50 text-indigo-700 shadow-sm' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'} ${isSidebarCollapsed ? 'justify-center px-0' : ''}`} title="Painel de Status">
-            <LayoutDashboard size={22} className={currentRoute === 'dashboard' ? 'text-indigo-600' : ''} />
+          {/* Menus usando Cores HEX Absolutas para forçar o Azul */}
+          <button onClick={() => setCurrentRoute('dashboard')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${currentRoute === 'dashboard' ? 'bg-[#f0f4ff] text-[#1e3a8a] shadow-sm' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'} ${isSidebarCollapsed ? 'justify-center px-0' : ''}`} title="Painel de Status">
+            <LayoutDashboard size={22} className={currentRoute === 'dashboard' ? 'text-[#2563eb]' : ''} />
             {!isSidebarCollapsed && <span className="text-sm whitespace-nowrap">Painel de Status</span>}
           </button>
           
-          <button onClick={() => setCurrentRoute('pdi')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${currentRoute === 'pdi' ? 'bg-indigo-50 text-indigo-700 shadow-sm' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'} ${isSidebarCollapsed ? 'justify-center px-0' : ''}`} title="PDI da Equipe">
-            <Target size={22} className={currentRoute === 'pdi' ? 'text-indigo-600' : ''} />
+          <button onClick={() => setCurrentRoute('pdi')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${currentRoute === 'pdi' ? 'bg-[#f0f4ff] text-[#1e3a8a] shadow-sm' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'} ${isSidebarCollapsed ? 'justify-center px-0' : ''}`} title="PDI da Equipe">
+            <Target size={22} className={currentRoute === 'pdi' ? 'text-[#2563eb]' : ''} />
             {!isSidebarCollapsed && <span className="text-sm whitespace-nowrap">PDI da Equipe</span>}
           </button>
 
-          <button onClick={() => setCurrentRoute('produtividade')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${currentRoute === 'produtividade' ? 'bg-indigo-50 text-indigo-700 shadow-sm' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'} ${isSidebarCollapsed ? 'justify-center px-0' : ''}`} title="Produtividade Real">
-            <Activity size={22} className={currentRoute === 'produtividade' ? 'text-indigo-600' : ''} />
+          <button onClick={() => setCurrentRoute('produtividade')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${currentRoute === 'produtividade' ? 'bg-[#f0f4ff] text-[#1e3a8a] shadow-sm' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'} ${isSidebarCollapsed ? 'justify-center px-0' : ''}`} title="Produtividade Real">
+            <Activity size={22} className={currentRoute === 'produtividade' ? 'text-[#2563eb]' : ''} />
             {!isSidebarCollapsed && <span className="text-sm whitespace-nowrap">Produtividade</span>}
           </button>
         </nav>
@@ -114,7 +114,7 @@ export default function App() {
                 </span>
                 
                 {isAdmin ? (
-                  <span className="text-[9px] bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-md font-bold uppercase tracking-widest mt-2 border border-indigo-200">Admin Geral</span>
+                  <span className="text-[9px] bg-[#dbeafe] text-[#1e3a8a] px-2 py-0.5 rounded-md font-bold uppercase tracking-widest mt-2 border border-[#bfdbfe]">Admin Geral</span>
                 ) : (
                   <span className="text-[9px] bg-slate-200 text-slate-600 px-2 py-0.5 rounded-md font-bold uppercase tracking-widest mt-2">Analista</span>
                 )}
@@ -133,12 +133,12 @@ export default function App() {
 
             {!isSidebarCollapsed && (
               <div className="absolute -top-3 -right-2 group">
-                <button className="bg-white border border-slate-200 text-slate-400 p-1 rounded-full hover:text-indigo-600 hover:bg-indigo-50 transition-colors shadow-sm cursor-help">
+                <button className="bg-white border border-slate-200 text-slate-400 p-1 rounded-full hover:text-[#2563eb] hover:bg-[#f0f4ff] transition-colors shadow-sm cursor-help">
                   <Info size={12} />
                 </button>
                 <div className="absolute bottom-full right-0 mb-2 w-48 bg-slate-800 text-white text-[10px] font-medium p-2.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none text-center shadow-xl z-50">
                   Sistema desenvolvido por:<br/>
-                  <strong className="text-indigo-400 uppercase tracking-wider block mt-1">Jeyson Lins</strong>
+                  <strong className="text-[#60a5fa] uppercase tracking-wider block mt-1">Jeyson Lins</strong>
                   <span className="opacity-80">jeyson.cont@gmail.com</span>
                 </div>
               </div>
