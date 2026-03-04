@@ -13,7 +13,6 @@ import { supabase } from '../supabase';
 const currentYearNum = new Date().getFullYear();
 const YEARS = Array.from({ length: 5 }, (_, i) => (currentYearNum - 1 + i).toString());
 
-// Recebendo a prop isAdmin para controle de acesso
 interface DashboardProps {
   isAdmin: boolean;
 }
@@ -223,11 +222,11 @@ export function Dashboard({ isAdmin }: DashboardProps) {
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-600 font-medium">Carregando painel de gestão...</div>;
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6">
-      <div className="max-w-[1600px] mx-auto space-y-6">
+    <div className="min-h-screen bg-slate-50 p-6 flex flex-col">
+      <div className="max-w-[1600px] w-full mx-auto space-y-6 flex flex-col flex-1 h-full">
         
-        {/* Header */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+        {/* Header Superior */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-200 shrink-0">
           <div>
             <h1 className="text-2xl font-bold text-slate-800">Painel de Status Contábil</h1>
             <p className="text-slate-500 text-sm mt-1">Gestão de clientes e atividades da equipe</p>
@@ -247,8 +246,6 @@ export function Dashboard({ isAdmin }: DashboardProps) {
             )}
             <div className="flex bg-slate-100 p-1 rounded-lg">
               <button onClick={() => setActiveTab('dashboard')} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'dashboard' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Painel</button>
-              
-              {/* Oculta botão de configurações para os Analistas */}
               {isAdmin && (
                 <button onClick={() => setActiveTab('settings')} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'settings' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Configurações</button>
               )}
@@ -259,7 +256,7 @@ export function Dashboard({ isAdmin }: DashboardProps) {
                 <button onClick={handleExportCSV} className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-lg font-medium transition-colors shadow-sm" title="Exportar dados cadastrais">
                   <Download size={18} /> Exportar
                 </button>
-                <button onClick={() => handleOpenModal()} className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-sm">
+                <button onClick={() => handleOpenModal()} className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-sm">
                   <Plus size={18} /> Novo Cliente
                 </button>
               </div>
@@ -271,21 +268,21 @@ export function Dashboard({ isAdmin }: DashboardProps) {
           <SettingsPanel settings={settings} setSettings={async (s) => { setSettings(s); await supabase.from('settings').update(s).eq('id', 1); }} />
         ) : (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4 shrink-0">
               <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col"><span className="text-slate-500 text-sm font-medium">Total Geral</span><span className="text-3xl font-bold text-slate-800 mt-2">{metrics.totalGeral}</span></div>
-              <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col"><span className="text-slate-500 text-sm font-medium">Clientes Ativos</span><span className="text-3xl font-bold text-indigo-600 mt-2">{metrics.totalAtivos}</span></div>
+              <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col"><span className="text-slate-500 text-sm font-medium">Clientes Ativos</span><span className="text-3xl font-bold text-orange-500 mt-2">{metrics.totalAtivos}</span></div>
               <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col"><span className="text-slate-500 text-sm font-medium">Concluídos ({activeMonth}/{activeYear})</span><span className="text-3xl font-bold text-emerald-600 mt-2">{metrics.completed}</span></div>
               <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col"><span className="text-slate-500 text-sm font-medium">Pendentes ({activeMonth}/{activeYear})</span><span className="text-3xl font-bold text-amber-500 mt-2">{metrics.pending}</span></div>
               <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col"><span className="text-slate-500 text-sm font-medium">Atrasados ({activeMonth}/{activeYear})</span><span className="text-3xl font-bold text-red-500 mt-2">{metrics.delayed}</span></div>
             </div>
 
-            <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row gap-4">
+            <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row gap-4 shrink-0">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                <input type="text" placeholder="Buscar empresa..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"/>
+                <input type="text" placeholder="Buscar empresa..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all"/>
               </div>
               <div className="flex flex-wrap gap-3 items-center">
-                <select value={filterResponsavel} onChange={(e) => setFilterResponsavel(e.target.value)} className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none">
+                <select value={filterResponsavel} onChange={(e) => setFilterResponsavel(e.target.value)} className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-orange-500">
                   <option value="">Responsável</option>
                   {activeAnalysts.map(r => <option key={r} value={r}>{r}</option>)}
                 </select>
@@ -312,15 +309,17 @@ export function Dashboard({ isAdmin }: DashboardProps) {
               </div>
             </div>
 
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-              <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-slate-300">
+            {/* TABELA COM ROLAGEM FIXA E SOMBRA DE TRANSIÇÃO */}
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col flex-1 min-h-[300px]">
+              <div className="overflow-auto scrollbar-thin scrollbar-thumb-slate-300 flex-1 relative">
                 <table className="w-full text-left text-sm whitespace-nowrap">
-                  <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-medium">
+                  <thead className="bg-slate-50 text-slate-600 font-medium sticky top-0 z-30 shadow-sm">
                     <tr>
-                      <th className="px-4 py-3 sticky left-0 bg-slate-50 z-10 w-32 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('responsavel')}>
+                      <th className="px-4 py-3 sticky left-0 z-40 bg-slate-50 w-32 border-r border-slate-200 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('responsavel')}>
                         <div className="flex items-center gap-1">Responsável <ArrowUpDown size={14} className="text-slate-400"/></div>
                       </th>
-                      <th className="px-4 py-3 sticky left-32 bg-slate-50 z-10 min-w-[200px] cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('empresa')}>
+                      {/* Efeito de Sombra (Drop Shadow) na coluna Empresa */}
+                      <th className="px-4 py-3 sticky left-[128px] z-40 bg-slate-50 min-w-[200px] shadow-[6px_0px_6px_-4px_rgba(0,0,0,0.1)] border-r border-slate-200 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('empresa')}>
                         <div className="flex items-center gap-1">Empresa <ArrowUpDown size={14} className="text-slate-400"/></div>
                       </th>
                       <th className="px-4 py-3 text-center w-24 border-r border-slate-100" title="Marcar se a empresa está sem movimento">S/ Mov.</th>
@@ -343,16 +342,21 @@ export function Dashboard({ isAdmin }: DashboardProps) {
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {filteredAndSortedClients.map((client) => (
-                      <tr key={client.id} className={`hover:bg-slate-50/50 transition-colors group ${client.is_inactive ? 'bg-red-50/30' : client.sem_movimento ? 'opacity-60 bg-slate-50' : ''}`}>
-                        <td className="px-4 py-3 sticky left-0 z-10 font-medium text-slate-700 bg-inherit">{client.responsavel}</td>
-                        <td className="px-4 py-3 sticky left-32 z-10 font-medium text-slate-900 bg-inherit">
+                      <tr key={client.id} className={`hover:bg-slate-50 transition-colors group ${client.is_inactive ? 'bg-red-50/30 hover:bg-red-50' : client.sem_movimento ? 'opacity-60 bg-slate-50' : ''}`}>
+                        
+                        {/* Células Fixas com fundo branco e tratamento de Hover via CSS */}
+                        <td className={`px-4 py-3 sticky left-0 z-20 font-medium text-slate-700 border-r border-slate-100 transition-colors ${client.is_inactive ? 'bg-red-50/30 group-hover:bg-red-50' : 'bg-white group-hover:bg-slate-50'}`}>
+                          {client.responsavel}
+                        </td>
+                        <td className={`px-4 py-3 sticky left-[128px] z-20 font-medium text-slate-900 border-r border-slate-200 shadow-[6px_0px_6px_-4px_rgba(0,0,0,0.1)] transition-colors ${client.is_inactive ? 'bg-red-50/30 group-hover:bg-red-50' : 'bg-white group-hover:bg-slate-50'}`}>
                           <div className="flex items-center gap-2">
                             {client.empresa}
                             {client.is_inactive && <span className="bg-red-100 text-red-700 text-[10px] font-bold px-2 py-0.5 rounded-md">INATIVO</span>}
                           </div>
                         </td>
+
                         <td className="px-4 py-3 text-center border-r border-slate-100">
-                          <input type="checkbox" checked={client.sem_movimento || false} onChange={(e) => handleToggleSemMovimento(client.id, e.target.checked)} className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer" title="Marcar como Sem Movimento" />
+                          <input type="checkbox" checked={client.sem_movimento || false} onChange={(e) => handleToggleSemMovimento(client.id, e.target.checked)} className="w-4 h-4 text-orange-500 rounded border-slate-300 focus:ring-orange-500 cursor-pointer" title="Marcar como Sem Movimento" />
                         </td>
                         <td className="px-4 py-3 text-slate-600">{client.atividade}</td>
                         <td className="px-4 py-3 text-center">
@@ -379,7 +383,7 @@ export function Dashboard({ isAdmin }: DashboardProps) {
                         })}
                         <td className="px-4 py-3 text-right">
                           <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button onClick={() => handleOpenModal(client)} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors" title="Editar"><Edit2 size={16} /></button>
+                            <button onClick={() => handleOpenModal(client)} className="p-1.5 text-slate-400 hover:text-orange-500 hover:bg-orange-50 rounded-md transition-colors" title="Editar"><Edit2 size={16} /></button>
                             <button onClick={async () => { if(window.confirm('Excluir definitivamente este cliente?')) { await supabase.from('clients').delete().eq('id', client.id); setClients(clients.filter(c => c.id !== client.id)); } }} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors" title="Excluir"><Trash2 size={16} /></button>
                           </div>
                         </td>
@@ -390,13 +394,12 @@ export function Dashboard({ isAdmin }: DashboardProps) {
               </div>
             </div>
 
-            <div className="flex items-center gap-6 bg-white p-4 rounded-2xl shadow-sm border border-slate-200 text-sm text-slate-600">
-              <span className="font-medium text-slate-800">Legenda Automática:</span>
+            <div className="flex flex-wrap items-center gap-4 lg:gap-6 bg-white p-4 rounded-2xl shadow-sm border border-slate-200 text-sm text-slate-600 shrink-0">
+              <span className="font-medium text-slate-800">Legenda:</span>
               <div className="flex items-center gap-2"><div className="w-4 h-4 rounded-full bg-gray-200"></div><span>Não iniciado</span></div>
-              <div className="flex items-center gap-2"><div className="w-4 h-4 rounded-full bg-amber-400"></div><span>Em Andamento / Pendente</span></div>
-              <div className="flex items-center gap-2"><div className="w-4 h-4 rounded-full bg-emerald-500"></div><span>Entregue / Concluído</span></div>
-              <div className="flex items-center gap-2"><div className="w-4 h-4 rounded-full bg-red-500"></div><span>Atrasado (Passou do prazo legal)</span></div>
-              <div className="flex items-center gap-2 ml-4 border-l border-slate-300 pl-4"><div className="w-4 h-4 rounded-full bg-slate-200 flex items-center justify-center text-[8px] font-bold text-slate-500">S/M</div><span>Sem Movimento</span></div>
+              <div className="flex items-center gap-2"><div className="w-4 h-4 rounded-full bg-amber-400"></div><span>Em Andamento</span></div>
+              <div className="flex items-center gap-2"><div className="w-4 h-4 rounded-full bg-emerald-500"></div><span>Concluído</span></div>
+              <div className="flex items-center gap-2"><div className="w-4 h-4 rounded-full bg-red-500"></div><span>Atrasado</span></div>
             </div>
           </>
         )}
@@ -416,7 +419,7 @@ export function Dashboard({ isAdmin }: DashboardProps) {
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Responsável</label>
-                <select required value={formData.responsavel || ''} onChange={(e) => setFormData({...formData, responsavel: e.target.value})} className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none">
+                <select required value={formData.responsavel || ''} onChange={(e) => setFormData({...formData, responsavel: e.target.value})} className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-orange-500">
                   <option value="">Selecione...</option>
                   {settings.responsaveis.map(r => <option key={r} value={r}>{r}</option>)}
                 </select>
@@ -449,36 +452,29 @@ export function Dashboard({ isAdmin }: DashboardProps) {
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center justify-between">
                     Tempo Est. (Dias)
-                    {/* AVISO VISUAL DE BLOQUEIO */}
                     {!isAdmin && <span className="text-[10px] bg-red-50 text-red-500 font-bold px-1.5 py-0.5 rounded uppercase tracking-wider">Bloqueado</span>}
                   </label>
                   <input 
-                    type="number" 
-                    step="0.5" 
-                    min="0" 
+                    type="number" step="0.5" min="0" 
                     value={formData.tempo_estimado || ''} 
                     onChange={(e) => setFormData({...formData, tempo_estimado: parseFloat(e.target.value) || 0})} 
-                    disabled={!isAdmin} // TRAVA DE SEGURANÇA AQUI
-                    className={`w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none ${!isAdmin ? 'bg-slate-100 cursor-not-allowed text-slate-400 opacity-70' : ''}`}
-                    placeholder={isAdmin ? "Ex: 1.5" : "Restrito ao Gestor"}
+                    disabled={!isAdmin} 
+                    className={`w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none ${!isAdmin ? 'bg-slate-100 cursor-not-allowed text-slate-400 opacity-70' : 'focus:border-orange-500'}`}
+                    placeholder={isAdmin ? "Ex: 1.5" : "Restrito"}
                   />
                 </div>
               </div>
               
               <div className="flex flex-col gap-2 pt-2">
                 <div className="flex items-center gap-2 bg-slate-50 p-3 rounded-lg border border-slate-200">
-                  <input type="checkbox" id="sem_movimento" checked={formData.sem_movimento || false} onChange={(e) => setFormData({...formData, sem_movimento: e.target.checked})} className="w-4 h-4 text-indigo-600 rounded cursor-pointer" />
+                  <input type="checkbox" id="sem_movimento" checked={formData.sem_movimento || false} onChange={(e) => setFormData({...formData, sem_movimento: e.target.checked})} className="w-4 h-4 text-orange-500 rounded border-slate-300 cursor-pointer focus:ring-orange-500" />
                   <label htmlFor="sem_movimento" className="text-sm font-medium text-slate-700 cursor-pointer">Marcar empresa como "Sem Movimento"</label>
-                </div>
-                <div className="flex items-center gap-2 bg-red-50 p-3 rounded-lg border border-red-100">
-                  <input type="checkbox" id="is_inactive" checked={formData.is_inactive || false} onChange={(e) => setFormData({...formData, is_inactive: e.target.checked})} className="w-4 h-4 text-red-600 rounded cursor-pointer" />
-                  <label htmlFor="is_inactive" className="text-sm font-medium text-red-700 cursor-pointer">Marcar como Ex-cliente (Inativo)</label>
                 </div>
               </div>
 
               <div className="pt-4 flex justify-end gap-3">
                 <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-slate-600 font-medium hover:bg-slate-100 rounded-lg transition-colors">Cancelar</button>
-                <button type="submit" className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors">Salvar Alterações</button>
+                <button type="submit" className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white font-medium rounded-lg transition-colors shadow-sm">Salvar Alterações</button>
               </div>
             </form>
           </div>
