@@ -18,8 +18,9 @@ import {
   Activity,
   LogOut,
   Info,
-  MonitorPlay, // Ícone de Ativar TV
-  Pause        // Ícone de Pausar TV
+  MonitorPlay,
+  Pause,
+  Timer // Importando o ícone do Cronômetro
 } from 'lucide-react';
 
 export default function App() {
@@ -28,23 +29,25 @@ export default function App() {
   const [currentRoute, setCurrentRoute] = useState<'dashboard' | 'pdi' | 'produtividade'>('dashboard');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   
-  // Novo Estado do Modo TV
+  // Estados da Gestão à Vista (Modo TV)
   const [isTvMode, setIsTvMode] = useState(false);
+  const [tvInterval, setTvInterval] = useState<number>(5); // Tempo padrão: 5 minutos
+  const [showTvSettings, setShowTvSettings] = useState(false);
 
-  // Efeito que controla o Timer de 5 Minutos
+  // Efeito que controla o Timer Dinâmico
   useEffect(() => {
     let interval: NodeJS.Timeout;
     
     if (isTvMode) {
       interval = setInterval(() => {
         setCurrentRoute(prevRoute => prevRoute === 'dashboard' ? 'produtividade' : 'dashboard');
-      }, 5 * 60 * 1000); // 5 minutos exatos
+      }, tvInterval * 60 * 1000); // Multiplica os minutos escolhidos por 60.000 ms
     }
 
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [isTvMode]);
+  }, [isTvMode, tvInterval]); // Atualiza o timer automaticamente se você mudar os minutos
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -127,22 +130,67 @@ export default function App() {
         <div className="p-4 border-t border-slate-50">
           <div className="bg-slate-50 rounded-xl p-3 flex flex-col items-center border border-slate-100 relative">
             
-            {/* BOTÃO MODO TV (ESQUERDA) */}
+            {/* BLOCO DOS BOTÕES DA TV (ESQUERDA) */}
             {!isSidebarCollapsed && (
-              <div className="absolute -top-3 left-2 group z-10">
-                <button 
-                  onClick={() => setIsTvMode(!isTvMode)}
-                  className={`bg-white border p-1 rounded-full shadow-sm transition-colors ${
-                    isTvMode 
-                      ? 'border-emerald-200 text-emerald-500 hover:bg-emerald-50' 
-                      : 'border-slate-200 text-slate-400 hover:text-[#2563eb] hover:bg-[#f0f4ff]'
-                  }`}
-                  title={isTvMode ? "Pausar Modo TV" : "Modo TV (Auto-rotação 5 min)"}
-                >
-                  {isTvMode ? <Pause size={12} /> : <MonitorPlay size={12} />}
-                </button>
-                <div className="absolute bottom-full left-0 mb-2 w-48 bg-slate-800 text-white text-[10px] font-medium p-2.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none text-center shadow-xl">
-                  {isTvMode ? "Modo TV Ativado. O painel vai girar a cada 5 minutos." : "Ativar Gestão à Vista (Modo TV). Gira abas a cada 5 min."}
+              <div className="absolute -top-3 left-2 flex items-center gap-1 z-50">
+                
+                {/* Botão Play/Pause TV */}
+                <div className="group relative">
+                  <button 
+                    onClick={() => {
+                      setIsTvMode(!isTvMode);
+                      setShowTvSettings(false); // Fecha o menu se estiver aberto
+                    }}
+                    className={`bg-white border p-1 rounded-full shadow-sm transition-colors ${
+                      isTvMode 
+                        ? 'border-emerald-200 text-emerald-500 hover:bg-emerald-50' 
+                        : 'border-slate-200 text-slate-400 hover:text-[#2563eb] hover:bg-[#f0f4ff]'
+                    }`}
+                  >
+                    {isTvMode ? <Pause size={12} /> : <MonitorPlay size={12} />}
+                  </button>
+                  <div className="absolute bottom-full left-0 mb-2 w-48 bg-slate-800 text-white text-[10px] font-medium p-2.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none text-center shadow-xl">
+                    {isTvMode ? `Modo TV Ativado. Gira a cada ${tvInterval} min.` : "Ativar Gestão à Vista. Gira as abas automaticamente."}
+                  </div>
+                </div>
+
+                {/* Botão Configuração de Tempo (Cronômetro) */}
+                <div className="relative">
+                  <button 
+                    onClick={() => setShowTvSettings(!showTvSettings)}
+                    className={`bg-white border p-1 rounded-full shadow-sm transition-colors ${
+                      showTvSettings 
+                        ? 'border-[#2563eb] text-[#2563eb] bg-[#f0f4ff]' 
+                        : 'border-slate-200 text-slate-400 hover:text-[#2563eb] hover:bg-[#f0f4ff]'
+                    }`}
+                  >
+                    <Timer size={12} />
+                  </button>
+
+                  {/* Menu Dropdown de Minutos */}
+                  {showTvSettings && (
+                    <div className="absolute bottom-full left-0 mb-2 w-28 bg-white border border-slate-200 rounded-lg shadow-xl overflow-hidden flex flex-col z-50">
+                      <div className="bg-slate-50 text-slate-500 text-[9px] font-black uppercase tracking-widest text-center py-1.5 border-b border-slate-100">
+                        Intervalo
+                      </div>
+                      {[1, 2, 3, 5, 10, 15].map((min) => (
+                        <button
+                          key={min}
+                          onClick={() => {
+                            setTvInterval(min);
+                            setShowTvSettings(false); // Fecha ao clicar
+                          }}
+                          className={`px-3 py-1.5 text-xs text-left transition-colors ${
+                            tvInterval === min
+                              ? 'bg-[#f0f4ff] text-[#1e3a8a] font-bold'
+                              : 'text-slate-600 hover:bg-slate-50 hover:text-[#2563eb]'
+                          }`}
+                        >
+                          {min} minuto{min > 1 ? 's' : ''}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             )}
