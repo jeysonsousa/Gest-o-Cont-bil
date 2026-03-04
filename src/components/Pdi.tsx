@@ -244,7 +244,7 @@ export function Pdi() {
       <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <Target className="text-indigo-800" /> PDI da Equipe
+            <Target className="text-indigo-800" /> PDI da Equipe - TESTE
           </h1>
           <p className="text-slate-500 text-sm mt-1">Plano de Ação e Desempenho Mensal</p>
         </div>
