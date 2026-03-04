@@ -5,13 +5,19 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../supabase';
-import { PdiEntry, Client, AppSettings, MONTHS, Status, StatusRecord } from '../types';
+import { PdiEntry, Client, AppSettings, MONTHS, Status, StatusRecord, UsuarioConfig } from '../types';
 import { Save, Plus, Trash2, Target, Check, CheckCheck, Search } from 'lucide-react';
 
 const currentYearNum = new Date().getFullYear();
 const YEARS = Array.from({ length: 5 }, (_, i) => (currentYearNum - 1 + i).toString());
 
-export function Pdi() {
+// Recebendo as props de controle de acesso
+interface PdiProps {
+  isAdmin: boolean;
+  userEmail: string;
+}
+
+export function Pdi({ isAdmin, userEmail }: PdiProps) {
   const [activeMonth, setActiveMonth] = useState<string>(MONTHS[new Date().getMonth()]);
   const [activeYear, setActiveYear] = useState<string>(currentYearNum.toString());
   const [activeResponsavel, setActiveResponsavel] = useState<string>('');
@@ -22,37 +28,62 @@ export function Pdi() {
   const [baseClients, setBaseClients] = useState<Client[]>([]); 
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  
-  // NOVO: Estado para a busca
   const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     async function fetchData() {
       const { data: settingsData } = await supabase.from('settings').select('*').eq('id', 1).single();
+      
       if (settingsData) {
         setSettings(settingsData);
-      }
+        
+        // RECUPERA A LISTA DE USUÁRIOS (NOME + EMAIL) DAS CONFIGURAÇÕES
+        const usuariosConfig: UsuarioConfig[] = settingsData.usuarios || [];
 
-      const { data: clientsData } = await supabase.from('clients').select('responsavel, is_inactive, sem_movimento');
-      if (clientsData) {
-        const list = clientsData.filter(c => !c.is_inactive).map(c => c.responsavel);
-        const uniqueAnalysts = [...new Set(list)].sort();
+        const { data: clientsData } = await supabase.from('clients').select('responsavel, is_inactive, sem_movimento');
         
-        setActiveAnalysts(uniqueAnalysts);
-        
-        if (uniqueAnalysts.length > 0 && !activeResponsavel) {
-          setActiveResponsavel(uniqueAnalysts[0]);
+        if (clientsData) {
+          // Pega todos os responsáveis que têm clientes ativos
+          const list = clientsData.filter(c => !c.is_inactive).map(c => c.responsavel);
+          const uniqueAnalysts = [...new Set(list)].sort();
+          
+          let allowedAnalysts = uniqueAnalysts;
+          
+          // BLOQUEIO RESTRITO: Compara o e-mail logado com o e-mail cadastrado nas configurações
+          if (!isAdmin) {
+            const loggedUserConfig = usuariosConfig.find(u => u.email.toLowerCase() === userEmail.toLowerCase());
+            
+            if (loggedUserConfig) {
+              // Se achou o e-mail, ele só pode ver a carteira dele mesmo
+              allowedAnalysts = uniqueAnalysts.filter(a => a === loggedUserConfig.nome);
+            } else {
+              // Se o e-mail logado não estiver na lista de usuários configurados, bloqueia tudo
+              allowedAnalysts = [];
+            }
+          }
+          
+          setActiveAnalysts(allowedAnalysts);
+          
+          if (allowedAnalysts.length > 0 && !activeResponsavel) {
+            setActiveResponsavel(allowedAnalysts[0]);
+          } else if (allowedAnalysts.length === 0 && !isAdmin) {
+            setActiveResponsavel('');
+          }
         }
       }
     }
     fetchData();
-  }, [activeResponsavel]);
+  }, [activeResponsavel, isAdmin, userEmail]);
 
   useEffect(() => {
     async function fetchPdiData() {
-      if (!activeResponsavel) return;
+      if (!activeResponsavel) {
+        setLocalData([]);
+        return;
+      }
+      
       setLoading(true);
-      setSearchTerm(''); // Limpa a busca ao trocar de mês ou responsável
+      setSearchTerm(''); 
 
       try {
         const { data: clientsData } = await supabase
@@ -250,7 +281,6 @@ export function Pdi() {
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - (metrics.avg / 100) * circumference;
 
-  // Variável para saber quantos registros sobraram após a busca
   const filteredDataCount = localData.filter(row => 
     !searchTerm || 
     row.empresa.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -271,7 +301,9 @@ export function Pdi() {
           <select 
             value={activeResponsavel} 
             onChange={(e) => setActiveResponsavel(e.target.value)}
-            className="bg-white border border-slate-200 px-3 py-2 rounded-lg text-sm font-medium focus:outline-none focus:border-indigo-500 min-w-[150px]"
+            disabled={!isAdmin} 
+            className={`border border-slate-200 px-3 py-2 rounded-lg text-sm font-medium focus:outline-none min-w-[150px] ${!isAdmin ? 'bg-slate-100 cursor-not-allowed text-slate-500' : 'bg-white focus:border-indigo-500'}`}
+            title={!isAdmin ? "Você só pode visualizar a sua própria carteira" : ""}
           >
             {activeAnalysts.map(r => <option key={r} value={r}>{r}</option>)}
           </select>
@@ -286,177 +318,185 @@ export function Pdi() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex">
-          <div className="bg-slate-500 text-white font-bold p-4 w-48 flex items-center justify-center text-center">
-            Evolução Mensal
-          </div>
-          <div className="flex-1 p-6 flex items-center justify-center gap-8">
-            <div className="relative w-32 h-32">
-              <svg className="w-full h-full transform -rotate-90">
-                <circle cx="64" cy="64" r={radius} stroke="currentColor" strokeWidth="20" fill="transparent" className="text-slate-100" />
-                <circle cx="64" cy="64" r={radius} stroke="currentColor" strokeWidth="20" fill="transparent"
-                  strokeDasharray={circumference} strokeDashoffset={strokeDashoffset}
-                  className="text-emerald-500 transition-all duration-1000 ease-out" />
-              </svg>
-              <div className="absolute inset-0 flex items-center justify-center flex-col">
-                <span className="text-2xl font-bold text-slate-800">{metrics.avg}%</span>
+      {activeAnalysts.length === 0 && !isAdmin ? (
+        <div className="bg-amber-50 p-8 rounded-2xl border border-amber-200 text-center">
+          <h3 className="text-amber-800 font-bold text-lg">Acesso Restrito</h3>
+          <p className="text-amber-700 mt-2">
+            Seu e-mail de acesso não foi vinculado a nenhum analista nas configurações.<br/>
+            Solicite ao Administrador Geral que cadastre seu e-mail no painel de Configurações.
+          </p>
+        </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex">
+              <div className="bg-slate-500 text-white font-bold p-4 w-48 flex items-center justify-center text-center">
+                Evolução Mensal
+              </div>
+              <div className="flex-1 p-6 flex items-center justify-center gap-8">
+                <div className="relative w-32 h-32">
+                  <svg className="w-full h-full transform -rotate-90">
+                    <circle cx="64" cy="64" r={radius} stroke="currentColor" strokeWidth="20" fill="transparent" className="text-slate-100" />
+                    <circle cx="64" cy="64" r={radius} stroke="currentColor" strokeWidth="20" fill="transparent"
+                      strokeDasharray={circumference} strokeDashoffset={strokeDashoffset}
+                      className="text-emerald-500 transition-all duration-1000 ease-out" />
+                  </svg>
+                  <div className="absolute inset-0 flex items-center justify-center flex-col">
+                    <span className="text-2xl font-bold text-slate-800">{metrics.avg}%</span>
+                  </div>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center gap-2"><div className="w-3 h-3 bg-emerald-500 rounded-full"></div><span className="text-sm text-slate-600 font-medium">Realizado</span></div>
+                  <div className="flex items-center gap-2"><div className="w-3 h-3 bg-slate-100 rounded-full"></div><span className="text-sm text-slate-600 font-medium">Pendente</span></div>
+                </div>
               </div>
             </div>
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center gap-2"><div className="w-3 h-3 bg-emerald-500 rounded-full"></div><span className="text-sm text-slate-600 font-medium">Realizado</span></div>
-              <div className="flex items-center gap-2"><div className="w-3 h-3 bg-slate-100 rounded-full"></div><span className="text-sm text-slate-600 font-medium">Pendente</span></div>
+
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
+              <div className="bg-slate-400 text-white font-bold p-2 text-center text-sm">Análise de Desempenho</div>
+              <div className="p-6 flex-1 flex flex-col justify-center gap-4">
+                <div className="flex justify-between items-center bg-slate-50 p-2 rounded border border-slate-100">
+                  <span className="text-sm font-bold text-slate-600">Desempenho:</span>
+                  <span className="font-bold text-slate-800">{(metrics.avg / 100).toFixed(2).replace('.', ',')}</span>
+                </div>
+                <div className="flex justify-between items-center bg-slate-50 p-2 rounded border border-slate-100">
+                  <span className="text-sm font-bold text-slate-600">% Concluído:</span>
+                  <span className="font-bold text-emerald-600">{metrics.avg}%</span>
+                </div>
+                <div className="flex justify-between items-center bg-slate-50 p-2 rounded border border-slate-100">
+                  <span className="text-sm font-bold text-slate-600">Atividades Prontas:</span>
+                  <span className="font-bold text-slate-800">{metrics.completed} / {metrics.total}</span>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
-          <div className="bg-slate-400 text-white font-bold p-2 text-center text-sm">Análise de Desempenho</div>
-          <div className="p-6 flex-1 flex flex-col justify-center gap-4">
-            <div className="flex justify-between items-center bg-slate-50 p-2 rounded border border-slate-100">
-              <span className="text-sm font-bold text-slate-600">Desempenho:</span>
-              <span className="font-bold text-slate-800">{(metrics.avg / 100).toFixed(2).replace('.', ',')}</span>
-            </div>
-            <div className="flex justify-between items-center bg-slate-50 p-2 rounded border border-slate-100">
-              <span className="text-sm font-bold text-slate-600">% Concluído:</span>
-              <span className="font-bold text-emerald-600">{metrics.avg}%</span>
-            </div>
-            <div className="flex justify-between items-center bg-slate-50 p-2 rounded border border-slate-100">
-              <span className="text-sm font-bold text-slate-600">Atividades Prontas:</span>
-              <span className="font-bold text-slate-800">{metrics.completed} / {metrics.total}</span>
-            </div>
-          </div>
-        </div>
-      </div>
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center p-4 border-b border-slate-200 bg-slate-50 gap-4">
+              <h2 className="font-bold text-slate-700 uppercase text-sm tracking-wider">Plano de Ação de {activeResponsavel}</h2>
+              
+              <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                <div className="relative flex-1 min-w-[200px]">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                  <input 
+                    type="text" 
+                    placeholder="Buscar empresa ou ação..." 
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
+                  />
+                </div>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        {/* NOVO HEADER DO PDI COM CAMPO DE BUSCA */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center p-4 border-b border-slate-200 bg-slate-50 gap-4">
-          <h2 className="font-bold text-slate-700 uppercase text-sm tracking-wider">Plano de Ação de {activeResponsavel}</h2>
-          
-          <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-            {/* Campo de Busca */}
-            <div className="relative flex-1 min-w-[200px]">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-              <input 
-                type="text" 
-                placeholder="Buscar empresa ou ação..." 
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
-              />
+                <button onClick={handleAddExtra} className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 rounded-lg transition-colors">
+                  <Plus size={16} /> Adicionar Extra
+                </button>
+                <button onClick={handleSave} disabled={saving} className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors disabled:opacity-50">
+                  <Save size={16} /> {saving ? 'Salvando...' : 'Salvar PDI'}
+                </button>
+              </div>
             </div>
 
-            <button onClick={handleAddExtra} className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 rounded-lg transition-colors">
-              <Plus size={16} /> Adicionar Extra
-            </button>
-            <button onClick={handleSave} disabled={saving} className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors disabled:opacity-50">
-              <Save size={16} /> {saving ? 'Salvando...' : 'Salvar PDI'}
-            </button>
-          </div>
-        </div>
-
-        <div className="overflow-x-auto">
-          {loading ? (
-            <div className="p-8 text-center text-slate-500">Carregando carteira de clientes...</div>
-          ) : (
-            <table className="w-full text-sm text-left whitespace-nowrap">
-              <thead className="bg-slate-200 text-slate-700 font-bold text-[10px] uppercase tracking-wider">
-                <tr>
-                  <th className="px-4 py-3 border-r border-slate-300">Empresas</th>
-                  <th className="px-4 py-3 border-r border-slate-300">Ação</th>
-                  <th className="px-4 py-3 border-r border-slate-300 text-center w-24">Competência</th>
-                  <th className="px-3 py-3 border-r border-slate-300 w-32 text-center">Início</th>
-                  <th className="px-3 py-3 border-r border-slate-300 w-32 text-center">Término</th>
-                  <th className="px-3 py-3 border-r border-slate-300 w-[140px] text-center">Prazo Realiz.</th>
-                  <th className="px-3 py-3 border-r border-slate-300 w-16 text-center">Status</th>
-                  <th className="px-4 py-3 border-r border-slate-300">Observação</th>
-                  <th className="px-3 py-3 text-center">Validações / Ações</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200">
-                {localData.map((row, index) => {
-                  // Lógica da Busca: se não bater com a pesquisa, retorna null (oculta a linha sem afetar o index)
-                  if (searchTerm && 
-                      !row.empresa.toLowerCase().includes(searchTerm.toLowerCase()) && 
-                      !row.atividade.toLowerCase().includes(searchTerm.toLowerCase())) {
-                    return null;
-                  }
-
-                  const light = getTrafficLight(row);
-                  return (
-                    <tr key={index} className={row.is_extra ? 'bg-indigo-50/30' : 'hover:bg-slate-50'}>
-                      <td className="p-1 border-r border-slate-200">
-                        <input type="text" value={row.empresa} onChange={(e) => handleInputChange(index, 'empresa', e.target.value)} disabled={!row.is_extra} className={`w-full p-2 outline-none uppercase font-bold text-xs ${!row.is_extra ? 'bg-transparent text-slate-700' : 'bg-white border border-slate-300 rounded'}`} placeholder="NOME DA EMPRESA" />
-                      </td>
-                      <td className="p-1 border-r border-slate-200">
-                        <input type="text" value={row.atividade} onChange={(e) => handleInputChange(index, 'atividade', e.target.value)} className="w-full p-2 outline-none bg-transparent text-indigo-700 font-bold text-xs" placeholder="Qual a ação?" />
-                      </td>
-                      <td className="p-1 border-r border-slate-200 text-center">
-                        <input type="text" value={row.competencia} onChange={(e) => handleInputChange(index, 'competencia', e.target.value)} className="w-full p-2 outline-none bg-transparent text-slate-500 text-xs text-center" />
-                      </td>
-                      <td className="p-1 border-r border-slate-200">
-                        <input type="date" value={row.inicio || ''} onChange={(e) => handleInputChange(index, 'inicio', e.target.value)} className="w-full p-1.5 outline-none bg-white border border-slate-200 rounded text-xs text-slate-600" />
-                      </td>
-                      <td className="p-1 border-r border-slate-200">
-                        <input type="date" value={row.termino || ''} onChange={(e) => handleInputChange(index, 'termino', e.target.value)} className="w-full p-1.5 outline-none bg-white border border-slate-200 rounded text-xs text-slate-600" />
-                      </td>
-                      <td className="p-1 border-r border-slate-200 bg-slate-50/50">
-                        <div className="flex flex-col gap-1 items-center">
-                          <input type="date" value={row.prazo_realizado || ''} onChange={(e) => handleInputChange(index, 'prazo_realizado', e.target.value)} className="w-full p-1.5 outline-none bg-white border border-slate-200 rounded text-xs text-slate-600" />
-                          <label className="flex items-center gap-1 cursor-pointer hover:bg-slate-200 px-1.5 rounded transition-colors" title="Marque se utilizou apenas meio expediente">
-                            <input type="checkbox" checked={row.meio_expediente || false} onChange={(e) => handleInputChange(index, 'meio_expediente', e.target.checked)} className="w-3 h-3 text-indigo-600 rounded border-slate-300" />
-                            <span className="text-[9px] font-bold text-slate-500 uppercase">-0,5 DIA</span>
-                          </label>
-                        </div>
-                      </td>
-                      <td className="p-1 border-r border-slate-200 text-center">
-                        <div className={`mx-auto w-4 h-4 rounded-full ${light.color} shadow-inner`} title={light.title}></div>
-                      </td>
-                      <td className="p-1 border-r border-slate-200">
-                        <input type="text" value={row.observacao} onChange={(e) => handleInputChange(index, 'observacao', e.target.value)} className="w-full p-2 outline-none bg-transparent text-xs text-slate-600" placeholder="Insira uma nota..." />
-                      </td>
-                      <td className="p-1 text-center">
-                        <div className="flex items-center justify-center gap-2">
-                          <button 
-                            onClick={() => handleAnalystConfirm(index)} 
-                            className={`p-1.5 rounded-md transition-colors ${row.status === 'analyst' || row.status === 'ok' ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`} 
-                            title={row.status === 'n' ? "Finalizar Tarefa (Analista)" : "Tarefa Finalizada"}
-                          >
-                            <Check size={16} />
-                          </button>
-                          
-                          <button 
-                            onClick={() => handleManagerConfirm(index)} 
-                            disabled={row.status === 'n'}
-                            className={`p-1.5 rounded-md transition-colors ${row.status === 'ok' ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'} disabled:opacity-30 disabled:cursor-not-allowed`} 
-                            title={row.status === 'ok' ? "Validado pelo Gestor" : "Validar (Gestor)"}
-                          >
-                            <CheckCheck size={16} />
-                          </button>
-
-                          {row.is_extra && (
-                            <button onClick={() => handleDeleteExtra(index)} className="p-1.5 text-red-500 hover:bg-red-50 rounded" title="Excluir Extra">
-                              <Trash2 size={16} />
-                            </button>
-                          )}
-                        </div>
-                      </td>
+            <div className="overflow-x-auto">
+              {loading ? (
+                <div className="p-8 text-center text-slate-500">Carregando carteira de clientes...</div>
+              ) : (
+                <table className="w-full text-sm text-left whitespace-nowrap">
+                  <thead className="bg-slate-200 text-slate-700 font-bold text-[10px] uppercase tracking-wider">
+                    <tr>
+                      <th className="px-4 py-3 border-r border-slate-300">Empresas</th>
+                      <th className="px-4 py-3 border-r border-slate-300">Ação</th>
+                      <th className="px-4 py-3 border-r border-slate-300 text-center w-24">Competência</th>
+                      <th className="px-3 py-3 border-r border-slate-300 w-32 text-center">Início</th>
+                      <th className="px-3 py-3 border-r border-slate-300 w-32 text-center">Término</th>
+                      <th className="px-3 py-3 border-r border-slate-300 w-[140px] text-center">Prazo Realiz.</th>
+                      <th className="px-3 py-3 border-r border-slate-300 w-16 text-center">Status</th>
+                      <th className="px-4 py-3 border-r border-slate-300">Observação</th>
+                      <th className="px-3 py-3 text-center">Validações / Ações</th>
                     </tr>
-                  );
-                })}
-                
-                {/* Mensagem caso a busca não retorne resultados */}
-                {filteredDataCount === 0 && !loading && (
-                  <tr>
-                    <td colSpan={9} className="p-8 text-center text-slate-500 font-medium">Nenhuma empresa ou ação encontrada com o termo "{searchTerm}".</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          )}
-        </div>
-      </div>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200">
+                    {localData.map((row, index) => {
+                      if (searchTerm && 
+                          !row.empresa.toLowerCase().includes(searchTerm.toLowerCase()) && 
+                          !row.atividade.toLowerCase().includes(searchTerm.toLowerCase())) {
+                        return null;
+                      }
+
+                      const light = getTrafficLight(row);
+                      return (
+                        <tr key={index} className={row.is_extra ? 'bg-indigo-50/30' : 'hover:bg-slate-50'}>
+                          <td className="p-1 border-r border-slate-200">
+                            <input type="text" value={row.empresa} onChange={(e) => handleInputChange(index, 'empresa', e.target.value)} disabled={!row.is_extra} className={`w-full p-2 outline-none uppercase font-bold text-xs ${!row.is_extra ? 'bg-transparent text-slate-700' : 'bg-white border border-slate-300 rounded'}`} placeholder="NOME DA EMPRESA" />
+                          </td>
+                          <td className="p-1 border-r border-slate-200">
+                            <input type="text" value={row.atividade} onChange={(e) => handleInputChange(index, 'atividade', e.target.value)} className="w-full p-2 outline-none bg-transparent text-indigo-700 font-bold text-xs" placeholder="Qual a ação?" />
+                          </td>
+                          <td className="p-1 border-r border-slate-200 text-center">
+                            <input type="text" value={row.competencia} onChange={(e) => handleInputChange(index, 'competencia', e.target.value)} className="w-full p-2 outline-none bg-transparent text-slate-500 text-xs text-center" />
+                          </td>
+                          <td className="p-1 border-r border-slate-200">
+                            <input type="date" value={row.inicio || ''} onChange={(e) => handleInputChange(index, 'inicio', e.target.value)} className="w-full p-1.5 outline-none bg-white border border-slate-200 rounded text-xs text-slate-600" />
+                          </td>
+                          <td className="p-1 border-r border-slate-200">
+                            <input type="date" value={row.termino || ''} onChange={(e) => handleInputChange(index, 'termino', e.target.value)} className="w-full p-1.5 outline-none bg-white border border-slate-200 rounded text-xs text-slate-600" />
+                          </td>
+                          <td className="p-1 border-r border-slate-200 bg-slate-50/50">
+                            <div className="flex flex-col gap-1 items-center">
+                              <input type="date" value={row.prazo_realizado || ''} onChange={(e) => handleInputChange(index, 'prazo_realizado', e.target.value)} className="w-full p-1.5 outline-none bg-white border border-slate-200 rounded text-xs text-slate-600" />
+                              <label className="flex items-center gap-1 cursor-pointer hover:bg-slate-200 px-1.5 rounded transition-colors" title="Marque se utilizou apenas meio expediente">
+                                <input type="checkbox" checked={row.meio_expediente || false} onChange={(e) => handleInputChange(index, 'meio_expediente', e.target.checked)} className="w-3 h-3 text-indigo-600 rounded border-slate-300" />
+                                <span className="text-[9px] font-bold text-slate-500 uppercase">-0,5 DIA</span>
+                              </label>
+                            </div>
+                          </td>
+                          <td className="p-1 border-r border-slate-200 text-center">
+                            <div className={`mx-auto w-4 h-4 rounded-full ${light.color} shadow-inner`} title={light.title}></div>
+                          </td>
+                          <td className="p-1 border-r border-slate-200">
+                            <input type="text" value={row.observacao} onChange={(e) => handleInputChange(index, 'observacao', e.target.value)} className="w-full p-2 outline-none bg-transparent text-xs text-slate-600" placeholder="Insira uma nota..." />
+                          </td>
+                          <td className="p-1 text-center">
+                            <div className="flex items-center justify-center gap-2">
+                              <button 
+                                onClick={() => handleAnalystConfirm(index)} 
+                                className={`p-1.5 rounded-md transition-colors ${row.status === 'analyst' || row.status === 'ok' ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`} 
+                                title={row.status === 'n' ? "Finalizar Tarefa (Analista)" : "Tarefa Finalizada"}
+                              >
+                                <Check size={16} />
+                              </button>
+                              
+                              <button 
+                                onClick={() => handleManagerConfirm(index)} 
+                                disabled={row.status === 'n' || !isAdmin}
+                                className={`p-1.5 rounded-md transition-colors ${row.status === 'ok' ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'} disabled:opacity-30 disabled:cursor-not-allowed`} 
+                                title={row.status === 'ok' ? "Validado pelo Gestor" : isAdmin ? "Validar (Gestor)" : "Apenas o Gestor pode validar"}
+                              >
+                                <CheckCheck size={16} />
+                              </button>
+
+                              {row.is_extra && (
+                                <button onClick={() => handleDeleteExtra(index)} className="p-1.5 text-red-500 hover:bg-red-50 rounded" title="Excluir Extra">
+                                  <Trash2 size={16} />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    
+                    {filteredDataCount === 0 && !loading && (
+                      <tr>
+                        <td colSpan={9} className="p-8 text-center text-slate-500 font-medium">Nenhuma empresa ou ação encontrada com o termo "{searchTerm}".</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
