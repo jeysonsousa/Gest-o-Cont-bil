@@ -20,7 +20,6 @@ if (defaultMonthIndex < 0) {
   defaultYearNum -= 1;    
 }
 
-// Helper para a busca por data (Permite buscar por "DD/MM/YYYY" ou "YYYY-MM-DD")
 const formatDateForSearch = (dateStr?: string) => {
   if (!dateStr) return '';
   const parts = dateStr.split('-');
@@ -30,7 +29,8 @@ const formatDateForSearch = (dateStr?: string) => {
   return dateStr;
 };
 
-export function Pdi() {
+// RECEBENDO O DEPARTAMENTO COMO PROP
+export function Pdi({ currentDepartment }: { currentDepartment: string }) {
   const [isAdmin, setIsAdmin] = useState(false);
   const [userEmail, setUserEmail] = useState('');
   const [authLoaded, setAuthLoaded] = useState(false);
@@ -48,7 +48,6 @@ export function Pdi() {
   const [saving, setSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Estados das sanfonas (Pendentes abertas, Concluídas fechadas)
   const [showPending, setShowPending] = useState(true);
   const [showCompleted, setShowCompleted] = useState(false);
 
@@ -61,12 +60,15 @@ export function Pdi() {
     });
   }, []);
 
+  // RECARREGA OS ANALISTAS QUANDO O DEPARTAMENTO MUDA
   useEffect(() => {
     if (!authLoaded) return;
 
     async function fetchRoles() {
       const { data: settingsData } = await supabase.from('settings').select('*').eq('id', 1).single();
-      const { data: clientsData } = await supabase.from('clients').select('responsavel, is_inactive, sem_movimento');
+      const { data: clientsData } = await supabase.from('clients')
+        .select('responsavel, is_inactive, sem_movimento, departamento')
+        .eq('departamento', currentDepartment); // Filtra só os analistas do Setor atual
       
       if (settingsData) {
         setSettings(settingsData);
@@ -98,8 +100,9 @@ export function Pdi() {
       }
     }
     fetchRoles();
-  }, [authLoaded, isAdmin, userEmail]);
+  }, [authLoaded, isAdmin, userEmail, currentDepartment]);
 
+  // RECARREGA AS METAS QUANDO O DEPARTAMENTO MUDA
   useEffect(() => {
     async function fetchPdiData() {
       if (!activeResponsavel) {
@@ -110,13 +113,21 @@ export function Pdi() {
       setSearchTerm(''); 
 
       try {
-        const { data: clientsData } = await supabase.from('clients').select('*').eq('responsavel', activeResponsavel);
-        const { data: pdiData } = await supabase.from('pdi_entries').select('*').eq('responsavel', activeResponsavel).eq('mes', activeMonth).eq('ano', activeYear);
+        const { data: clientsData } = await supabase.from('clients')
+          .select('*')
+          .eq('responsavel', activeResponsavel)
+          .eq('departamento', currentDepartment);
+
+        const { data: pdiData } = await supabase.from('pdi_entries')
+          .select('*')
+          .eq('responsavel', activeResponsavel)
+          .eq('mes', activeMonth)
+          .eq('ano', activeYear)
+          .eq('departamento', currentDepartment);
 
         const clients = clientsData || [];
         const dbEntries = pdiData || [];
         
-        // Mantém apenas se for uma tarefa 'Extra' ou se a empresa ainda existir no painel
         const activeClients = clients.filter((c: Client) => !c.sem_movimento && !c.is_inactive);
         const activeClientNames = activeClients.map((c: Client) => c.empresa);
 
@@ -125,7 +136,6 @@ export function Pdi() {
         const combined: PdiEntry[] = [...validDbEntries];
         setBaseClients(activeClients); 
 
-        // Adiciona empresas novas que não estão no PDI ainda
         activeClients.forEach((client: Client) => {
           const exists = validDbEntries.find(e => e.empresa === client.empresa && !e.is_extra);
           if (!exists) {
@@ -133,7 +143,7 @@ export function Pdi() {
               responsavel: activeResponsavel, empresa: client.empresa, atividade: 'Contabilização',
               competencia: `${activeMonth}/${activeYear}`, inicio: '', termino: '', prazo_realizado: '',
               meio_expediente: false, percentual: 0, status: 'n', observacao: '',
-              mes: activeMonth, ano: activeYear, is_extra: false
+              mes: activeMonth, ano: activeYear, is_extra: false, departamento: currentDepartment
             });
           }
         });
@@ -147,7 +157,7 @@ export function Pdi() {
       }
     }
     fetchPdiData();
-  }, [activeMonth, activeYear, activeResponsavel]);
+  }, [activeMonth, activeYear, activeResponsavel, currentDepartment]);
 
   const metrics = useMemo(() => {
     if (localData.length === 0) return { avg: 0, total: 0, completed: 0 };
@@ -157,10 +167,8 @@ export function Pdi() {
     return { avg, total, completed };
   }, [localData]);
 
-  // Divisão Inteligente de Listas (Pendentes e Concluídas) COM NOVA REGRA DE BUSCA
   const groupedTasks = useMemo(() => {
     const tasksWithIndex = localData.map((row, index) => ({ row, index }));
-    
     const pending = tasksWithIndex.filter(item => item.row.status === 'n');
     const completed = tasksWithIndex.filter(item => item.row.status === 'analyst' || item.row.status === 'ok');
 
@@ -176,10 +184,7 @@ export function Pdi() {
       );
     };
 
-    return {
-      filteredPending: pending.filter(filterFn),
-      filteredCompleted: completed.filter(filterFn)
-    };
+    return { filteredPending: pending.filter(filterFn), filteredCompleted: completed.filter(filterFn) };
   }, [localData, searchTerm]);
 
   const handleInputChange = (index: number, field: keyof PdiEntry, value: string | number | boolean) => {
@@ -192,7 +197,7 @@ export function Pdi() {
     setLocalData([...localData, {
       responsavel: activeResponsavel, empresa: '', atividade: '', competencia: `${activeMonth}/${activeYear}`,
       inicio: '', termino: '', prazo_realizado: '', meio_expediente: false, percentual: 0, status: 'n',
-      observacao: '', mes: activeMonth, ano: activeYear, is_extra: true
+      observacao: '', mes: activeMonth, ano: activeYear, is_extra: true, departamento: currentDepartment
     }]);
   };
 
@@ -232,7 +237,8 @@ export function Pdi() {
       for (const row of localData) {
         const dbRow = {
           ...row, inicio: row.inicio || null, termino: row.termino || null,
-          prazo_realizado: row.prazo_realizado || null, meio_expediente: row.meio_expediente || false 
+          prazo_realizado: row.prazo_realizado || null, meio_expediente: row.meio_expediente || false,
+          departamento: currentDepartment 
         };
 
         if (row.id) {
@@ -283,7 +289,6 @@ export function Pdi() {
 
   if (!authLoaded) return <div className="p-8 text-center font-bold text-slate-500">Autenticando painel...</div>;
 
-  // Função utilitária para renderizar as linhas
   const renderRow = (row: PdiEntry, index: number) => {
     const light = getTrafficLight(row);
     return (
@@ -320,7 +325,7 @@ export function Pdi() {
       <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <Target className="text-[#1e3a8a]" /> PDI da Equipe
+            <Target className="text-[#1e3a8a]" /> PDI da Equipe: <span className="text-[#2563eb]">{currentDepartment}</span>
           </h1>
           <p className="text-slate-500 text-sm mt-1">Plano de Ação e Desempenho Mensal</p>
         </div>
@@ -348,33 +353,17 @@ export function Pdi() {
       {activeAnalysts.length === 0 && !isAdmin ? (
         <div className="bg-amber-50 p-8 rounded-2xl border border-amber-200 text-center max-w-2xl mx-auto mt-10">
           <ShieldAlert className="mx-auto text-amber-500 mb-4" size={48} />
-          <h3 className="text-amber-800 font-bold text-xl">Acesso Restrito</h3>
-          <p className="text-amber-700 mt-2 font-medium">Seu e-mail não foi encontrado na base de analistas autorizados.</p>
-          
-          <div className="mt-6 bg-white p-4 rounded-xl border border-amber-100 text-left">
-            <p className="text-xs font-bold text-slate-500 uppercase tracking-widest border-b border-slate-100 pb-2 mb-3">Diagnóstico do Sistema</p>
-            <p className="text-sm text-slate-700"><strong>Seu E-mail de login:</strong> <span className="text-[#2563eb]">{userEmail}</span></p>
-            <p className="text-sm text-slate-700 mt-2"><strong>Analistas cadastrados pelo Admin:</strong> {debugUsuarios.length}</p>
-            {debugUsuarios.length > 0 && (
-              <ul className="mt-2 space-y-1">
-                {debugUsuarios.map((u, i) => (
-                  <li key={i} className="text-xs text-slate-500 font-mono bg-slate-50 p-1 rounded">• Nome: {u.nome} | E-mail: {u.email}</li>
-                ))}
-              </ul>
-            )}
-            <p className="text-xs text-amber-600 mt-4 font-medium italic">* Peça ao Administrador para cadastrar seu e-mail exatamente como aparece acima na aba Configurações.</p>
-          </div>
+          <h3 className="text-amber-800 font-bold text-xl">Nenhum Analista no {currentDepartment}</h3>
+          <p className="text-amber-700 mt-2 font-medium">Cadastre empresas e responsáveis para este departamento no Painel.</p>
         </div>
       ) : (
         <>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex">
-              
               <div className="bg-gradient-to-br from-[#1e3a8a] to-[#0f172a] text-white p-6 w-48 flex flex-col items-center justify-center text-center shadow-inner">
                 <PieChart size={32} className="mb-2 opacity-80" />
                 <span className="font-bold text-sm uppercase tracking-wider">Evolução<br/>Mensal</span>
               </div>
-              
               <div className="flex-1 p-6 flex items-center justify-center gap-8">
                 <div className="relative w-32 h-32">
                   <svg className="w-full h-full transform -rotate-90">
@@ -420,7 +409,6 @@ export function Pdi() {
               <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
                 <div className="relative flex-1 min-w-[280px]">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                  {/* Placeholder atualizado para avisar que busca por data */}
                   <input type="text" placeholder="Buscar empresa, ação ou data..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20 transition-all"/>
                 </div>
 
@@ -435,7 +423,7 @@ export function Pdi() {
 
             <div className="overflow-x-auto">
               {loading ? (
-                <div className="p-8 text-center text-slate-500">Carregando carteira de clientes...</div>
+                <div className="p-8 text-center text-slate-500">Carregando dados do setor {currentDepartment}...</div>
               ) : (
                 <table className="w-full text-sm text-left whitespace-nowrap">
                   <thead className="bg-slate-200 text-slate-700 font-bold text-[10px] uppercase tracking-wider">
@@ -452,7 +440,6 @@ export function Pdi() {
                     </tr>
                   </thead>
                   
-                  {/* SEÇÃO 1: METAS PENDENTES (Aberta por Padrão) */}
                   <tbody onClick={() => setShowPending(!showPending)} className="group cursor-pointer">
                     <tr>
                       <td colSpan={9} className="p-0">
@@ -475,12 +462,8 @@ export function Pdi() {
                     </tbody>
                   )}
 
-                  {/* Espaçador entre as tabelas */}
-                  <tbody className="bg-white">
-                    <tr><td colSpan={9} className="p-1"></td></tr>
-                  </tbody>
+                  <tbody className="bg-white"><tr><td colSpan={9} className="p-1"></td></tr></tbody>
 
-                  {/* SEÇÃO 2: METAS CONCLUÍDAS (Fechada por Padrão) */}
                   <tbody onClick={() => setShowCompleted(!showCompleted)} className="group cursor-pointer">
                     <tr>
                       <td colSpan={9} className="p-0">
@@ -502,7 +485,6 @@ export function Pdi() {
                       )}
                     </tbody>
                   )}
-
                 </table>
               )}
             </div>
