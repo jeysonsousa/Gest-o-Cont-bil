@@ -17,7 +17,7 @@ import {
   Menu,
   Activity,
   LogOut,
-  Info // Importando o ícone de informação
+  Info 
 } from 'lucide-react';
 
 export default function App() {
@@ -61,39 +61,44 @@ export default function App() {
       <div className={`${isSidebarCollapsed ? 'w-20' : 'w-64'} bg-white border-r border-slate-200 flex flex-col shadow-sm z-50 transition-all duration-300 ease-in-out relative`}>
         <button 
           onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-          className="absolute -right-3 top-10 bg-white border border-slate-200 rounded-full p-1 text-slate-400 hover:text-orange-500 shadow-sm z-50 transition-colors"
+          className="absolute -right-3 top-10 bg-white border border-slate-200 rounded-full p-1 text-slate-400 hover:text-indigo-600 shadow-sm z-50 transition-colors"
           title={isSidebarCollapsed ? "Expandir menu" : "Recolher menu"}
         >
           {isSidebarCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
         </button>
 
-        {/* HEADER DA SIDEBAR COM LOGO E NOME */}
-        <div className={`p-6 border-b border-slate-100 flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'}`}>
-          {/* Espaço para a Logo da VSM (Pode trocar o src pela URL da logo real depois) */}
-          <div className="w-8 h-8 rounded bg-orange-500 flex items-center justify-center text-white font-black shrink-0 shadow-sm">
-            V
-          </div>
-          
-          {!isSidebarCollapsed && (
-            <div className="overflow-hidden">
-              <h1 className="text-xl font-black text-slate-800 whitespace-nowrap tracking-tight">Gestão 360º</h1>
-            </div>
+        {/* HEADER DA SIDEBAR COM A LOGO OFICIAL */}
+        <div className={`p-6 border-b border-slate-100 flex items-center h-24 ${isSidebarCollapsed ? 'justify-center p-2' : 'justify-start'}`}>
+          {isSidebarCollapsed ? (
+            <Menu className="text-indigo-600" size={24} />
+          ) : (
+            <img 
+              src="/logo.png" 
+              alt="VSM Gestão Contábil" 
+              className="max-h-full max-w-full object-contain"
+              onError={(e) => {
+                // Fallback caso a imagem não carregue no primeiro teste
+                (e.target as HTMLImageElement).style.display = 'none';
+                (e.target as HTMLImageElement).parentElement!.innerHTML = '<h1 class="text-2xl font-black text-indigo-900 tracking-tight">VSM</h1>';
+              }}
+            />
           )}
         </div>
         
         <nav className="flex-1 p-4 space-y-2">
-          <button onClick={() => setCurrentRoute('dashboard')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${currentRoute === 'dashboard' ? 'bg-orange-50 text-orange-600 shadow-sm' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'} ${isSidebarCollapsed ? 'justify-center px-0' : ''}`} title="Painel de Status">
-            <LayoutDashboard size={22} className={currentRoute === 'dashboard' ? 'text-orange-500' : ''} />
+          {/* Menus restaurados para o Índigo */}
+          <button onClick={() => setCurrentRoute('dashboard')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${currentRoute === 'dashboard' ? 'bg-indigo-50 text-indigo-700 shadow-sm' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'} ${isSidebarCollapsed ? 'justify-center px-0' : ''}`} title="Painel de Status">
+            <LayoutDashboard size={22} className={currentRoute === 'dashboard' ? 'text-indigo-600' : ''} />
             {!isSidebarCollapsed && <span className="text-sm whitespace-nowrap">Painel de Status</span>}
           </button>
           
-          <button onClick={() => setCurrentRoute('pdi')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${currentRoute === 'pdi' ? 'bg-orange-50 text-orange-600 shadow-sm' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'} ${isSidebarCollapsed ? 'justify-center px-0' : ''}`} title="PDI da Equipe">
-            <Target size={22} className={currentRoute === 'pdi' ? 'text-orange-500' : ''} />
+          <button onClick={() => setCurrentRoute('pdi')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${currentRoute === 'pdi' ? 'bg-indigo-50 text-indigo-700 shadow-sm' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'} ${isSidebarCollapsed ? 'justify-center px-0' : ''}`} title="PDI da Equipe">
+            <Target size={22} className={currentRoute === 'pdi' ? 'text-indigo-600' : ''} />
             {!isSidebarCollapsed && <span className="text-sm whitespace-nowrap">PDI da Equipe</span>}
           </button>
 
-          <button onClick={() => setCurrentRoute('produtividade')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${currentRoute === 'produtividade' ? 'bg-orange-50 text-orange-600 shadow-sm' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'} ${isSidebarCollapsed ? 'justify-center px-0' : ''}`} title="Produtividade Real">
-            <Activity size={22} className={currentRoute === 'produtividade' ? 'text-orange-500' : ''} />
+          <button onClick={() => setCurrentRoute('produtividade')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${currentRoute === 'produtividade' ? 'bg-indigo-50 text-indigo-700 shadow-sm' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'} ${isSidebarCollapsed ? 'justify-center px-0' : ''}`} title="Produtividade Real">
+            <Activity size={22} className={currentRoute === 'produtividade' ? 'text-indigo-600' : ''} />
             {!isSidebarCollapsed && <span className="text-sm whitespace-nowrap">Produtividade</span>}
           </button>
         </nav>
@@ -108,13 +113,13 @@ export default function App() {
                 </span>
                 
                 {isAdmin ? (
-                  <span className="text-[9px] bg-orange-100 text-orange-700 px-2 py-0.5 rounded-md font-bold uppercase tracking-widest mt-2 border border-orange-200">Admin Geral</span>
+                  <span className="text-[9px] bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-md font-bold uppercase tracking-widest mt-2 border border-indigo-200">Admin Geral</span>
                 ) : (
                   <span className="text-[9px] bg-slate-200 text-slate-600 px-2 py-0.5 rounded-md font-bold uppercase tracking-widest mt-2">Analista</span>
                 )}
 
                 <button onClick={handleLogout} className="mt-3 flex items-center justify-center gap-2 w-full px-3 py-2 text-xs font-bold text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-transparent hover:border-red-100">
-                  <LogOut size={14} /> Sair do Sistema
+                  <LogOut size={14} /> Sair
                 </button>
               </>
             )}
@@ -128,12 +133,12 @@ export default function App() {
             {/* BOTÃO "i" COM TOOLTIP */}
             {!isSidebarCollapsed && (
               <div className="absolute -top-3 -right-2 group">
-                <button className="bg-white border border-slate-200 text-slate-400 p-1 rounded-full hover:text-orange-500 hover:bg-orange-50 transition-colors shadow-sm cursor-help">
+                <button className="bg-white border border-slate-200 text-slate-400 p-1 rounded-full hover:text-indigo-600 hover:bg-indigo-50 transition-colors shadow-sm cursor-help">
                   <Info size={12} />
                 </button>
                 <div className="absolute bottom-full right-0 mb-2 w-48 bg-slate-800 text-white text-[10px] font-medium p-2.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none text-center shadow-xl z-50">
                   Sistema desenvolvido por:<br/>
-                  <strong className="text-orange-400 uppercase tracking-wider block mt-1">Jeyson Lins</strong>
+                  <strong className="text-indigo-400 uppercase tracking-wider block mt-1">Jeyson Lins</strong>
                   <span className="opacity-80">jeyson.cont@gmail.com</span>
                 </div>
               </div>
