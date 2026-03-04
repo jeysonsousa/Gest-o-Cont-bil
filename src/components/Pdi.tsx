@@ -21,16 +21,14 @@ if (defaultMonthIndex < 0) {
   defaultYearNum -= 1;    
 }
 
-interface PdiProps {
-  isAdmin: boolean;
-  userEmail: string;
-}
-
-export function Pdi({ isAdmin, userEmail }: PdiProps) {
-  const [authLoaded, setAuthLoaded] = useState(true);
+export function Pdi() {
+  // 1. Estados de Autenticação Autossuficientes (Blindagem Restaurada)
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [userEmail, setUserEmail] = useState('');
+  const [authLoaded, setAuthLoaded] = useState(false);
   const [debugUsuarios, setDebugUsuarios] = useState<UsuarioConfig[]>([]);
 
-  // Inicia com o mês contábil correto
+  // 2. Inicia com o mês contábil correto (Mês Anterior)
   const [activeMonth, setActiveMonth] = useState<string>(MONTHS[defaultMonthIndex]);
   const [activeYear, setActiveYear] = useState<string>(defaultYearNum.toString());
   const [activeResponsavel, setActiveResponsavel] = useState<string>('');
@@ -43,7 +41,20 @@ export function Pdi({ isAdmin, userEmail }: PdiProps) {
   const [saving, setSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
+  // 3. Verifica quem está logado DIRETAMENTE no banco (Sem depender do App.tsx)
   useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      const email = data.session?.user.email?.toLowerCase().trim() || '';
+      setUserEmail(email);
+      setIsAdmin(email === 'jeyson@vsmweb.com.br');
+      setAuthLoaded(true);
+    });
+  }, []);
+
+  // 4. Carrega as Regras e Configurações
+  useEffect(() => {
+    if (!authLoaded) return;
+
     async function fetchRoles() {
       const { data: settingsData } = await supabase.from('settings').select('*').eq('id', 1).single();
       const { data: clientsData } = await supabase.from('clients').select('responsavel, is_inactive, sem_movimento');
@@ -61,9 +72,11 @@ export function Pdi({ isAdmin, userEmail }: PdiProps) {
         let allowedAnalysts: string[] = [];
         
         if (isAdmin) {
+          // Admin vê todos
           const configuredNames = usuariosConfig.map(u => u.nome.toUpperCase());
           allowedAnalysts = [...new Set([...list.map(n => n.toUpperCase()), ...configuredNames])].sort();
         } else {
+          // Analista vê só a si mesmo se o e-mail bater
           const myConfig = usuariosConfig.find(u => u.email.toLowerCase().trim() === userEmail);
           if (myConfig) {
             allowedAnalysts = [myConfig.nome.toUpperCase()];
@@ -78,8 +91,9 @@ export function Pdi({ isAdmin, userEmail }: PdiProps) {
       }
     }
     fetchRoles();
-  }, [isAdmin, userEmail]);
+  }, [authLoaded, isAdmin, userEmail]);
 
+  // 5. Busca os dados do PDI
   useEffect(() => {
     async function fetchPdiData() {
       if (!activeResponsavel) {
@@ -230,7 +244,7 @@ export function Pdi({ isAdmin, userEmail }: PdiProps) {
   const strokeDashoffset = circumference - (metrics.avg / 100) * circumference;
   const filteredDataCount = localData.filter(row => !searchTerm || row.empresa.toLowerCase().includes(searchTerm.toLowerCase()) || row.atividade.toLowerCase().includes(searchTerm.toLowerCase())).length;
 
-  if (!authLoaded) return <div className="p-8 text-center font-bold text-slate-500">Autenticando...</div>;
+  if (!authLoaded) return <div className="p-8 text-center font-bold text-slate-500">Autenticando painel...</div>;
 
   return (
     <div className="p-6 max-w-[1600px] mx-auto space-y-6">
@@ -267,13 +281,26 @@ export function Pdi({ isAdmin, userEmail }: PdiProps) {
           <ShieldAlert className="mx-auto text-amber-500 mb-4" size={48} />
           <h3 className="text-amber-800 font-bold text-xl">Acesso Restrito</h3>
           <p className="text-amber-700 mt-2 font-medium">Seu e-mail não foi encontrado na base de analistas autorizados.</p>
+          
+          <div className="mt-6 bg-white p-4 rounded-xl border border-amber-100 text-left">
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-widest border-b border-slate-100 pb-2 mb-3">Diagnóstico do Sistema</p>
+            <p className="text-sm text-slate-700"><strong>Seu E-mail de login:</strong> <span className="text-indigo-600">{userEmail}</span></p>
+            <p className="text-sm text-slate-700 mt-2"><strong>Analistas cadastrados pelo Admin:</strong> {debugUsuarios.length}</p>
+            {debugUsuarios.length > 0 && (
+              <ul className="mt-2 space-y-1">
+                {debugUsuarios.map((u, i) => (
+                  <li key={i} className="text-xs text-slate-500 font-mono bg-slate-50 p-1 rounded">• Nome: {u.nome} | E-mail: {u.email}</li>
+                ))}
+              </ul>
+            )}
+            <p className="text-xs text-amber-600 mt-4 font-medium italic">* Peça ao Administrador para cadastrar seu e-mail exatamente como aparece acima na aba Configurações.</p>
+          </div>
         </div>
       ) : (
         <>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex">
               
-              {/* O NOVO CARD COM O VISUAL DA VSM */}
               <div className="bg-gradient-to-br from-indigo-600 to-indigo-800 text-white p-6 w-48 flex flex-col items-center justify-center text-center shadow-inner">
                 <PieChart size={32} className="mb-2 opacity-80" />
                 <span className="font-bold text-sm uppercase tracking-wider">Evolução<br/>Mensal</span>
@@ -297,7 +324,6 @@ export function Pdi({ isAdmin, userEmail }: PdiProps) {
             </div>
 
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
-              {/* HEADER DO CARD ALINHADO AO NOVO VISUAL */}
               <div className="bg-slate-100 text-indigo-900 font-black p-3 text-center text-sm border-b border-slate-200">
                 ANÁLISE DE DESEMPENHO
               </div>
