@@ -67,26 +67,29 @@ export default function App() {
           {isSidebarCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
         </button>
 
-        {/* HEADER DA SIDEBAR COM A LOGO OFICIAL */}
-        <div className={`p-6 border-b border-slate-100 flex items-center h-24 ${isSidebarCollapsed ? 'justify-center p-2' : 'justify-start'}`}>
-          {isSidebarCollapsed ? (
-            <Menu className="text-indigo-600" size={24} />
+        {/* HEADER DA SIDEBAR COM A LOGO OFICIAL E O TÍTULO */}
+        <div className={`p-6 border-b border-slate-100 flex flex-col items-center justify-center min-h-[120px] transition-all ${isSidebarCollapsed ? 'p-2 min-h-[80px]' : ''}`}>
+          {!isSidebarCollapsed ? (
+            <>
+              {/* Mostra a logo. Se falhar, tem texto de fallback */}
+              <img 
+                src="/logo.png" 
+                alt="VSM" 
+                className="h-10 object-contain mb-3"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = 'none';
+                }}
+              />
+              <span className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] bg-slate-50 px-3 py-1 rounded-full border border-slate-100">Gestão 360º</span>
+            </>
           ) : (
-            <img 
-              src="/logo.png" 
-              alt="VSM Gestão Contábil" 
-              className="max-h-full max-w-full object-contain"
-              onError={(e) => {
-                // Fallback caso a imagem não carregue no primeiro teste
-                (e.target as HTMLImageElement).style.display = 'none';
-                (e.target as HTMLImageElement).parentElement!.innerHTML = '<h1 class="text-2xl font-black text-indigo-900 tracking-tight">VSM</h1>';
-              }}
-            />
+             /* Ícone pequeno quando a barra for recolhida */
+             <img src="/guia.png" alt="VSM" className="h-8 object-contain" />
           )}
         </div>
         
         <nav className="flex-1 p-4 space-y-2">
-          {/* Menus restaurados para o Índigo */}
+          {/* Menus restaurados para o padrão Índigo da VSM */}
           <button onClick={() => setCurrentRoute('dashboard')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${currentRoute === 'dashboard' ? 'bg-indigo-50 text-indigo-700 shadow-sm' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'} ${isSidebarCollapsed ? 'justify-center px-0' : ''}`} title="Painel de Status">
             <LayoutDashboard size={22} className={currentRoute === 'dashboard' ? 'text-indigo-600' : ''} />
             {!isSidebarCollapsed && <span className="text-sm whitespace-nowrap">Painel de Status</span>}
@@ -103,7 +106,7 @@ export default function App() {
           </button>
         </nav>
 
-        {/* RODAPÉ DA SIDEBAR */}
+        {/* RODAPÉ DA SIDEBAR COM BOTÃO "i" */}
         <div className="p-4 border-t border-slate-50">
           <div className="bg-slate-50 rounded-xl p-3 flex flex-col items-center border border-slate-100 relative">
             {!isSidebarCollapsed && (
@@ -130,7 +133,7 @@ export default function App() {
                </button>
             )}
 
-            {/* BOTÃO "i" COM TOOLTIP */}
+            {/* O BOTÃO 'i' DISCRETO AQUI */}
             {!isSidebarCollapsed && (
               <div className="absolute -top-3 -right-2 group">
                 <button className="bg-white border border-slate-200 text-slate-400 p-1 rounded-full hover:text-indigo-600 hover:bg-indigo-50 transition-colors shadow-sm cursor-help">
@@ -151,7 +154,7 @@ export default function App() {
         {currentRoute === 'dashboard' ? (
           <Dashboard isAdmin={isAdmin} />
         ) : currentRoute === 'pdi' ? (
-          <Pdi isAdmin={isAdmin} userEmail={userEmail} />
+          <Pdi />
         ) : (
           <Produtividade />
         )}
