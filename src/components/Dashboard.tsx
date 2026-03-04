@@ -170,21 +170,11 @@ export function Dashboard({ isAdmin }: DashboardProps) {
       else if (c.sem_movimento) statusEmpresa = 'Sem Movimento';
 
       return [
-        c.responsavel || '',
-        c.empresa || '',
-        c.atividade || '',
-        c.prioridade || '',
-        c.tributacao || '',
-        c.tempo_estimado?.toString() || '0',
-        statusEmpresa
+        c.responsavel || '', c.empresa || '', c.atividade || '', c.prioridade || '', c.tributacao || '', c.tempo_estimado?.toString() || '0', statusEmpresa
       ];
     });
 
-    const csvContent = [
-      headers.join(';'),
-      ...rows.map(row => row.map(cell => `"${cell}"`).join(';'))
-    ].join('\n');
-
+    const csvContent = [headers.join(';'), ...rows.map(row => row.map(cell => `"${cell}"`).join(';'))].join('\n');
     const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -222,11 +212,12 @@ export function Dashboard({ isAdmin }: DashboardProps) {
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-600 font-medium">Carregando painel de gestão...</div>;
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6 flex flex-col">
-      <div className="max-w-[1600px] w-full mx-auto space-y-6 flex flex-col flex-1 h-full">
+    // ESTRUTURA FLEX H-FULL: Prende a tela ao tamanho do navegador para a barra não sumir
+    <div className="h-full bg-slate-50 p-4 md:p-6 flex flex-col min-h-[600px] overflow-hidden">
+      <div className="max-w-[1600px] w-full mx-auto flex flex-col flex-1 min-h-0 gap-4">
         
-        {/* Header Superior */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-200 shrink-0">
+        {/* Header Superior - (shrink-0 impede que ele seja esmagado) */}
+        <div className="shrink-0 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
           <div>
             <h1 className="text-2xl font-bold text-slate-800">Painel de Status Contábil</h1>
             <p className="text-slate-500 text-sm mt-1">Gestão de clientes e atividades da equipe</p>
@@ -256,7 +247,7 @@ export function Dashboard({ isAdmin }: DashboardProps) {
                 <button onClick={handleExportCSV} className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-lg font-medium transition-colors shadow-sm" title="Exportar dados cadastrais">
                   <Download size={18} /> Exportar
                 </button>
-                {/* Botão Principal com a Cor da Marca */}
+                {/* O Laranja Focado na Ação Principal */}
                 <button onClick={() => handleOpenModal()} className="flex items-center gap-2 bg-[#F26522] hover:bg-[#d9551c] text-white px-4 py-2 rounded-lg font-bold transition-colors shadow-sm">
                   <Plus size={18} /> Novo Cliente
                 </button>
@@ -266,18 +257,18 @@ export function Dashboard({ isAdmin }: DashboardProps) {
         </div>
 
         {activeTab === 'settings' && isAdmin ? (
-          <SettingsPanel settings={settings} setSettings={async (s) => { setSettings(s); await supabase.from('settings').update(s).eq('id', 1); }} />
+          <div className="flex-1 overflow-auto"><SettingsPanel settings={settings} setSettings={async (s) => { setSettings(s); await supabase.from('settings').update(s).eq('id', 1); }} /></div>
         ) : (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-4 shrink-0">
-              <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col"><span className="text-slate-500 text-sm font-medium">Total Geral</span><span className="text-3xl font-bold text-slate-800 mt-2">{metrics.totalGeral}</span></div>
-              <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col"><span className="text-slate-500 text-sm font-medium">Clientes Ativos</span><span className="text-3xl font-bold text-indigo-600 mt-2">{metrics.totalAtivos}</span></div>
-              <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col"><span className="text-slate-500 text-sm font-medium">Concluídos ({activeMonth}/{activeYear})</span><span className="text-3xl font-bold text-emerald-600 mt-2">{metrics.completed}</span></div>
-              <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col"><span className="text-slate-500 text-sm font-medium">Pendentes ({activeMonth}/{activeYear})</span><span className="text-3xl font-bold text-amber-500 mt-2">{metrics.pending}</span></div>
-              <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col"><span className="text-slate-500 text-sm font-medium">Atrasados ({activeMonth}/{activeYear})</span><span className="text-3xl font-bold text-red-500 mt-2">{metrics.delayed}</span></div>
+            <div className="shrink-0 grid grid-cols-1 md:grid-cols-5 gap-4">
+              <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col"><span className="text-slate-500 text-sm font-medium">Total Geral</span><span className="text-2xl font-bold text-slate-800 mt-1">{metrics.totalGeral}</span></div>
+              <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col"><span className="text-slate-500 text-sm font-medium">Clientes Ativos</span><span className="text-2xl font-bold text-indigo-600 mt-1">{metrics.totalAtivos}</span></div>
+              <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col"><span className="text-slate-500 text-sm font-medium">Concluídos ({activeMonth}/{activeYear})</span><span className="text-2xl font-bold text-emerald-600 mt-1">{metrics.completed}</span></div>
+              <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col"><span className="text-slate-500 text-sm font-medium">Pendentes ({activeMonth}/{activeYear})</span><span className="text-2xl font-bold text-amber-500 mt-1">{metrics.pending}</span></div>
+              <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col"><span className="text-slate-500 text-sm font-medium">Atrasados ({activeMonth}/{activeYear})</span><span className="text-2xl font-bold text-red-500 mt-1">{metrics.delayed}</span></div>
             </div>
 
-            <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row gap-4 shrink-0">
+            <div className="shrink-0 bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row gap-4">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                 <input type="text" placeholder="Buscar empresa..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"/>
@@ -300,27 +291,24 @@ export function Dashboard({ isAdmin }: DashboardProps) {
                   {settings.tributacoes.map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
                 
-                <button 
-                  onClick={() => setShowInactive(!showInactive)}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors border ${showInactive ? 'bg-slate-800 text-white border-slate-800' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
-                >
+                <button onClick={() => setShowInactive(!showInactive)} className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors border ${showInactive ? 'bg-slate-800 text-white border-slate-800' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}>
                   {showInactive ? <EyeOff size={16}/> : <UserCheck size={16}/>}
                   {showInactive ? "Ocultar Inativos" : "Ver Ex-Clientes"}
                 </button>
               </div>
             </div>
 
-            {/* TABELA COM ROLAGEM FIXA E SOMBRA DE TRANSIÇÃO */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col flex-1 min-h-[300px]">
-              <div className="overflow-auto scrollbar-thin scrollbar-thumb-slate-300 flex-1 relative">
-                <table className="w-full text-left text-sm whitespace-nowrap">
-                  <thead className="bg-slate-50 text-slate-600 font-medium sticky top-0 z-30 shadow-sm">
+            {/* TABELA COM OVERFLOW LOCAL E FUNDO SÓLIDO (BG-WHITE) PARA ESCONDER ROLAGEM */}
+            <div className="flex-1 min-h-0 bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col relative">
+              <div className="overflow-auto w-full h-full scrollbar-thin scrollbar-thumb-slate-300 rounded-2xl">
+                <table className="w-full text-left text-sm whitespace-nowrap border-collapse">
+                  <thead className="bg-slate-50 text-slate-600 font-medium sticky top-0 z-40 shadow-sm border-b border-slate-200">
                     <tr>
-                      <th className="px-4 py-3 sticky left-0 z-40 bg-slate-50 w-32 border-r border-slate-200 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('responsavel')}>
+                      <th className="px-4 py-3 sticky left-0 z-50 bg-slate-50 w-32 border-r border-slate-200 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('responsavel')}>
                         <div className="flex items-center gap-1">Responsável <ArrowUpDown size={14} className="text-slate-400"/></div>
                       </th>
-                      {/* Efeito de Sombra (Drop Shadow) na coluna Empresa */}
-                      <th className="px-4 py-3 sticky left-[128px] z-40 bg-slate-50 min-w-[200px] shadow-[6px_0px_6px_-4px_rgba(0,0,0,0.1)] border-r border-slate-200 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('empresa')}>
+                      {/* SOBREPOSIÇÃO RESOLVIDA: Sombra lateral projeta sobre as outras colunas */}
+                      <th className="px-4 py-3 sticky left-[128px] z-50 bg-slate-50 w-[200px] border-r border-slate-200 shadow-[6px_0px_8px_-4px_rgba(0,0,0,0.1)] cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('empresa')}>
                         <div className="flex items-center gap-1">Empresa <ArrowUpDown size={14} className="text-slate-400"/></div>
                       </th>
                       <th className="px-4 py-3 text-center w-24 border-r border-slate-100" title="Marcar se a empresa está sem movimento">S/ Mov.</th>
@@ -343,13 +331,13 @@ export function Dashboard({ isAdmin }: DashboardProps) {
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {filteredAndSortedClients.map((client) => (
-                      <tr key={client.id} className={`hover:bg-slate-50 transition-colors group ${client.is_inactive ? 'bg-red-50/30 hover:bg-red-50' : client.sem_movimento ? 'opacity-60 bg-slate-50' : ''}`}>
+                      <tr key={client.id} className={`hover:bg-slate-50 transition-colors group ${client.is_inactive ? 'bg-red-50/30' : client.sem_movimento ? 'opacity-60 bg-slate-50' : 'bg-white'}`}>
                         
-                        {/* Células Fixas com fundo branco e tratamento de Hover via CSS */}
-                        <td className={`px-4 py-3 sticky left-0 z-20 font-medium text-slate-700 border-r border-slate-100 transition-colors ${client.is_inactive ? 'bg-red-50/30 group-hover:bg-red-50' : 'bg-white group-hover:bg-slate-50'}`}>
+                        {/* FUNDO BRANCO OBRIGATÓRIO AQUI PARA NÃO FICAR TRANSPARENTE NA ROLAGEM */}
+                        <td className={`px-4 py-3 sticky left-0 z-30 font-medium text-slate-700 border-r border-slate-100 transition-colors ${client.is_inactive ? 'bg-red-50 group-hover:bg-red-100' : 'bg-white group-hover:bg-slate-50'}`}>
                           {client.responsavel}
                         </td>
-                        <td className={`px-4 py-3 sticky left-[128px] z-20 font-medium text-slate-900 border-r border-slate-200 shadow-[6px_0px_6px_-4px_rgba(0,0,0,0.1)] transition-colors ${client.is_inactive ? 'bg-red-50/30 group-hover:bg-red-50' : 'bg-white group-hover:bg-slate-50'}`}>
+                        <td className={`px-4 py-3 sticky left-[128px] z-30 font-medium text-slate-900 border-r border-slate-200 shadow-[6px_0px_8px_-4px_rgba(0,0,0,0.1)] transition-colors ${client.is_inactive ? 'bg-red-50 group-hover:bg-red-100' : 'bg-white group-hover:bg-slate-50'}`}>
                           <div className="flex items-center gap-2">
                             {client.empresa}
                             {client.is_inactive && <span className="bg-red-100 text-red-700 text-[10px] font-bold px-2 py-0.5 rounded-md">INATIVO</span>}
@@ -395,12 +383,12 @@ export function Dashboard({ isAdmin }: DashboardProps) {
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-4 lg:gap-6 bg-white p-4 rounded-2xl shadow-sm border border-slate-200 text-sm text-slate-600 shrink-0">
-              <span className="font-medium text-slate-800">Legenda:</span>
+            <div className="shrink-0 flex items-center gap-6 bg-white p-4 rounded-xl shadow-sm border border-slate-200 text-sm text-slate-600">
+              <span className="font-medium text-slate-800">Legenda Automática:</span>
               <div className="flex items-center gap-2"><div className="w-4 h-4 rounded-full bg-gray-200"></div><span>Não iniciado</span></div>
               <div className="flex items-center gap-2"><div className="w-4 h-4 rounded-full bg-amber-400"></div><span>Em Andamento</span></div>
               <div className="flex items-center gap-2"><div className="w-4 h-4 rounded-full bg-emerald-500"></div><span>Concluído</span></div>
-              <div className="flex items-center gap-2"><div className="w-4 h-4 rounded-full bg-red-500"></div><span>Atrasado</span></div>
+              <div className="flex items-center gap-2"><div className="w-4 h-4 rounded-full bg-red-500"></div><span>Atrasado (Passou do prazo)</span></div>
             </div>
           </>
         )}
