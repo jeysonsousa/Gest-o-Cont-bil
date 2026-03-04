@@ -71,7 +71,6 @@ export default function App() {
         <div className={`p-6 border-b border-slate-100 flex flex-col items-center justify-center min-h-[120px] transition-all ${isSidebarCollapsed ? 'p-2 min-h-[80px]' : ''}`}>
           {!isSidebarCollapsed ? (
             <>
-              {/* Mostra a logo. Se falhar, tem texto de fallback */}
               <img 
                 src="/logo.png" 
                 alt="VSM" 
@@ -83,13 +82,12 @@ export default function App() {
               <span className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] bg-slate-50 px-3 py-1 rounded-full border border-slate-100">Gestão 360º</span>
             </>
           ) : (
-             /* Ícone pequeno quando a barra for recolhida */
              <img src="/guia.png" alt="VSM" className="h-8 object-contain" />
           )}
         </div>
         
         <nav className="flex-1 p-4 space-y-2">
-          {/* Menus restaurados para o padrão Índigo da VSM */}
+          {/* Menus restaurados para o padrão ÍNDIGO da VSM */}
           <button onClick={() => setCurrentRoute('dashboard')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${currentRoute === 'dashboard' ? 'bg-indigo-50 text-indigo-700 shadow-sm' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'} ${isSidebarCollapsed ? 'justify-center px-0' : ''}`} title="Painel de Status">
             <LayoutDashboard size={22} className={currentRoute === 'dashboard' ? 'text-indigo-600' : ''} />
             {!isSidebarCollapsed && <span className="text-sm whitespace-nowrap">Painel de Status</span>}
@@ -133,7 +131,6 @@ export default function App() {
                </button>
             )}
 
-            {/* O BOTÃO 'i' DISCRETO AQUI */}
             {!isSidebarCollapsed && (
               <div className="absolute -top-3 -right-2 group">
                 <button className="bg-white border border-slate-200 text-slate-400 p-1 rounded-full hover:text-indigo-600 hover:bg-indigo-50 transition-colors shadow-sm cursor-help">
