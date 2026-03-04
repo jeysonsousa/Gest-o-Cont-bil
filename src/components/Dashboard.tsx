@@ -256,7 +256,8 @@ export function Dashboard({ isAdmin }: DashboardProps) {
                 <button onClick={handleExportCSV} className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-lg font-medium transition-colors shadow-sm" title="Exportar dados cadastrais">
                   <Download size={18} /> Exportar
                 </button>
-                <button onClick={() => handleOpenModal()} className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-sm">
+                {/* Botão Principal com a Cor da Marca */}
+                <button onClick={() => handleOpenModal()} className="flex items-center gap-2 bg-[#F26522] hover:bg-[#d9551c] text-white px-4 py-2 rounded-lg font-bold transition-colors shadow-sm">
                   <Plus size={18} /> Novo Cliente
                 </button>
               </div>
@@ -270,7 +271,7 @@ export function Dashboard({ isAdmin }: DashboardProps) {
           <>
             <div className="grid grid-cols-1 md:grid-cols-5 gap-4 shrink-0">
               <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col"><span className="text-slate-500 text-sm font-medium">Total Geral</span><span className="text-3xl font-bold text-slate-800 mt-2">{metrics.totalGeral}</span></div>
-              <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col"><span className="text-slate-500 text-sm font-medium">Clientes Ativos</span><span className="text-3xl font-bold text-orange-500 mt-2">{metrics.totalAtivos}</span></div>
+              <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col"><span className="text-slate-500 text-sm font-medium">Clientes Ativos</span><span className="text-3xl font-bold text-indigo-600 mt-2">{metrics.totalAtivos}</span></div>
               <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col"><span className="text-slate-500 text-sm font-medium">Concluídos ({activeMonth}/{activeYear})</span><span className="text-3xl font-bold text-emerald-600 mt-2">{metrics.completed}</span></div>
               <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col"><span className="text-slate-500 text-sm font-medium">Pendentes ({activeMonth}/{activeYear})</span><span className="text-3xl font-bold text-amber-500 mt-2">{metrics.pending}</span></div>
               <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col"><span className="text-slate-500 text-sm font-medium">Atrasados ({activeMonth}/{activeYear})</span><span className="text-3xl font-bold text-red-500 mt-2">{metrics.delayed}</span></div>
@@ -279,22 +280,22 @@ export function Dashboard({ isAdmin }: DashboardProps) {
             <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row gap-4 shrink-0">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                <input type="text" placeholder="Buscar empresa..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all"/>
+                <input type="text" placeholder="Buscar empresa..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"/>
               </div>
               <div className="flex flex-wrap gap-3 items-center">
-                <select value={filterResponsavel} onChange={(e) => setFilterResponsavel(e.target.value)} className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-orange-500">
+                <select value={filterResponsavel} onChange={(e) => setFilterResponsavel(e.target.value)} className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-indigo-500">
                   <option value="">Responsável</option>
                   {activeAnalysts.map(r => <option key={r} value={r}>{r}</option>)}
                 </select>
-                <select value={filterAtividade} onChange={(e) => setFilterAtividade(e.target.value)} className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none">
+                <select value={filterAtividade} onChange={(e) => setFilterAtividade(e.target.value)} className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-indigo-500">
                   <option value="">Todas Atividades</option>
                   {settings.atividades.map(a => <option key={a} value={a}>{a}</option>)}
                 </select>
-                <select value={filterPrioridade} onChange={(e) => setFilterPrioridade(e.target.value)} className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none">
+                <select value={filterPrioridade} onChange={(e) => setFilterPrioridade(e.target.value)} className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-indigo-500">
                   <option value="">Todas Prioridades</option>
                   {settings.prioridades.map(p => <option key={p} value={p}>{p}</option>)}
                 </select>
-                <select value={filterTributacao} onChange={(e) => setFilterTributacao(e.target.value)} className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none">
+                <select value={filterTributacao} onChange={(e) => setFilterTributacao(e.target.value)} className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-indigo-500">
                   <option value="">Todas Tributações</option>
                   {settings.tributacoes.map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
@@ -356,7 +357,7 @@ export function Dashboard({ isAdmin }: DashboardProps) {
                         </td>
 
                         <td className="px-4 py-3 text-center border-r border-slate-100">
-                          <input type="checkbox" checked={client.sem_movimento || false} onChange={(e) => handleToggleSemMovimento(client.id, e.target.checked)} className="w-4 h-4 text-orange-500 rounded border-slate-300 focus:ring-orange-500 cursor-pointer" title="Marcar como Sem Movimento" />
+                          <input type="checkbox" checked={client.sem_movimento || false} onChange={(e) => handleToggleSemMovimento(client.id, e.target.checked)} className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer" title="Marcar como Sem Movimento" />
                         </td>
                         <td className="px-4 py-3 text-slate-600">{client.atividade}</td>
                         <td className="px-4 py-3 text-center">
@@ -383,7 +384,7 @@ export function Dashboard({ isAdmin }: DashboardProps) {
                         })}
                         <td className="px-4 py-3 text-right">
                           <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button onClick={() => handleOpenModal(client)} className="p-1.5 text-slate-400 hover:text-orange-500 hover:bg-orange-50 rounded-md transition-colors" title="Editar"><Edit2 size={16} /></button>
+                            <button onClick={() => handleOpenModal(client)} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors" title="Editar"><Edit2 size={16} /></button>
                             <button onClick={async () => { if(window.confirm('Excluir definitivamente este cliente?')) { await supabase.from('clients').delete().eq('id', client.id); setClients(clients.filter(c => c.id !== client.id)); } }} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors" title="Excluir"><Trash2 size={16} /></button>
                           </div>
                         </td>
@@ -415,11 +416,11 @@ export function Dashboard({ isAdmin }: DashboardProps) {
             <form onSubmit={handleSaveClient} className="p-6 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Empresa</label>
-                <input type="text" required value={formData.empresa || ''} onChange={(e) => setFormData({...formData, empresa: e.target.value.toUpperCase()})} className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none uppercase font-bold" placeholder="Nome da Empresa" />
+                <input type="text" required value={formData.empresa || ''} onChange={(e) => setFormData({...formData, empresa: e.target.value.toUpperCase()})} className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 uppercase font-bold" placeholder="Nome da Empresa" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Responsável</label>
-                <select required value={formData.responsavel || ''} onChange={(e) => setFormData({...formData, responsavel: e.target.value})} className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-orange-500">
+                <select required value={formData.responsavel || ''} onChange={(e) => setFormData({...formData, responsavel: e.target.value})} className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500">
                   <option value="">Selecione...</option>
                   {settings.responsaveis.map(r => <option key={r} value={r}>{r}</option>)}
                 </select>
@@ -427,14 +428,14 @@ export function Dashboard({ isAdmin }: DashboardProps) {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Atividade</label>
-                  <select required value={formData.atividade || ''} onChange={(e) => setFormData({...formData, atividade: e.target.value})} className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none">
+                  <select required value={formData.atividade || ''} onChange={(e) => setFormData({...formData, atividade: e.target.value})} className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500">
                     <option value="">Selecione...</option>
                     {settings.atividades.map(a => <option key={a} value={a}>{a}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Prioridade</label>
-                  <select required value={formData.prioridade || ''} onChange={(e) => setFormData({...formData, prioridade: e.target.value})} className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none">
+                  <select required value={formData.prioridade || ''} onChange={(e) => setFormData({...formData, prioridade: e.target.value})} className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500">
                     <option value="">Selecione...</option>
                     {settings.prioridades.map(p => <option key={p} value={p}>{p}</option>)}
                   </select>
@@ -444,7 +445,7 @@ export function Dashboard({ isAdmin }: DashboardProps) {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Tributação</label>
-                  <select required value={formData.tributacao || ''} onChange={(e) => setFormData({...formData, tributacao: e.target.value})} className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none">
+                  <select required value={formData.tributacao || ''} onChange={(e) => setFormData({...formData, tributacao: e.target.value})} className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500">
                     <option value="">Selecione...</option>
                     {settings.tributacoes.map(t => <option key={t} value={t}>{t}</option>)}
                   </select>
@@ -459,7 +460,7 @@ export function Dashboard({ isAdmin }: DashboardProps) {
                     value={formData.tempo_estimado || ''} 
                     onChange={(e) => setFormData({...formData, tempo_estimado: parseFloat(e.target.value) || 0})} 
                     disabled={!isAdmin} 
-                    className={`w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none ${!isAdmin ? 'bg-slate-100 cursor-not-allowed text-slate-400 opacity-70' : 'focus:border-orange-500'}`}
+                    className={`w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none ${!isAdmin ? 'bg-slate-100 cursor-not-allowed text-slate-400 opacity-70' : 'focus:border-indigo-500'}`}
                     placeholder={isAdmin ? "Ex: 1.5" : "Restrito"}
                   />
                 </div>
@@ -467,14 +468,14 @@ export function Dashboard({ isAdmin }: DashboardProps) {
               
               <div className="flex flex-col gap-2 pt-2">
                 <div className="flex items-center gap-2 bg-slate-50 p-3 rounded-lg border border-slate-200">
-                  <input type="checkbox" id="sem_movimento" checked={formData.sem_movimento || false} onChange={(e) => setFormData({...formData, sem_movimento: e.target.checked})} className="w-4 h-4 text-orange-500 rounded border-slate-300 cursor-pointer focus:ring-orange-500" />
+                  <input type="checkbox" id="sem_movimento" checked={formData.sem_movimento || false} onChange={(e) => setFormData({...formData, sem_movimento: e.target.checked})} className="w-4 h-4 text-indigo-600 rounded border-slate-300 cursor-pointer focus:ring-indigo-500" />
                   <label htmlFor="sem_movimento" className="text-sm font-medium text-slate-700 cursor-pointer">Marcar empresa como "Sem Movimento"</label>
                 </div>
               </div>
 
               <div className="pt-4 flex justify-end gap-3">
                 <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-slate-600 font-medium hover:bg-slate-100 rounded-lg transition-colors">Cancelar</button>
-                <button type="submit" className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white font-medium rounded-lg transition-colors shadow-sm">Salvar Alterações</button>
+                <button type="submit" className="px-4 py-2 bg-[#F26522] hover:bg-[#d9551c] text-white font-bold rounded-lg transition-colors shadow-sm">Salvar Alterações</button>
               </div>
             </form>
           </div>
