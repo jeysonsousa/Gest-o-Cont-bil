@@ -6,28 +6,26 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../supabase';
 import { PdiEntry, Client, AppSettings, MONTHS, Status, StatusRecord } from '../types';
-import { Save, Plus, Trash2, Target, Check, CheckCheck } from 'lucide-react';
+import { Save, Plus, Trash2, Target, Check, CheckCheck, Search } from 'lucide-react';
 
 const currentYearNum = new Date().getFullYear();
 const YEARS = Array.from({ length: 5 }, (_, i) => (currentYearNum - 1 + i).toString());
 
 export function Pdi() {
-  // Filtros Globais
   const [activeMonth, setActiveMonth] = useState<string>(MONTHS[new Date().getMonth()]);
   const [activeYear, setActiveYear] = useState<string>(currentYearNum.toString());
   const [activeResponsavel, setActiveResponsavel] = useState<string>('');
-
-  // Analistas Dinâmicos (Só mostra quem tem cliente ativo)
+  
   const [activeAnalysts, setActiveAnalysts] = useState<string[]>([]);
-
-  // Dados
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [localData, setLocalData] = useState<PdiEntry[]>([]);
-  const [baseClients, setBaseClients] = useState<Client[]>([]); // Guarda os clientes originais para sincronia
+  const [baseClients, setBaseClients] = useState<Client[]>([]); 
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  
+  // NOVO: Estado para a busca
+  const [searchTerm, setSearchTerm] = useState('');
 
-  // 1. Carregar Configurações e Analistas Dinamicamente
   useEffect(() => {
     async function fetchData() {
       const { data: settingsData } = await supabase.from('settings').select('*').eq('id', 1).single();
@@ -50,11 +48,11 @@ export function Pdi() {
     fetchData();
   }, [activeResponsavel]);
 
-  // 2. Carregar Dados do PDI Cruzados com Clientes
   useEffect(() => {
     async function fetchPdiData() {
       if (!activeResponsavel) return;
       setLoading(true);
+      setSearchTerm(''); // Limpa a busca ao trocar de mês ou responsável
 
       try {
         const { data: clientsData } = await supabase
@@ -74,7 +72,7 @@ export function Pdi() {
         const combined: PdiEntry[] = [...dbEntries];
 
         const activeClients = clients.filter((c: Client) => !c.sem_movimento && !c.is_inactive);
-        setBaseClients(activeClients); // Salva para a sincronização depois
+        setBaseClients(activeClients); 
 
         activeClients.forEach((client: Client) => {
           const exists = dbEntries.find(e => e.empresa === client.empresa && !e.is_extra);
@@ -87,7 +85,7 @@ export function Pdi() {
               inicio: '',
               termino: '',
               prazo_realizado: '',
-              meio_expediente: false, // Inicia a flag como false
+              meio_expediente: false,
               percentual: 0, 
               status: 'n',
               observacao: '',
@@ -186,13 +184,12 @@ export function Pdi() {
     setSaving(true);
     try {
       for (const row of localData) {
-        // 1. Salva no banco de dados do PDI
         const dbRow = {
           ...row,
           inicio: row.inicio || null,
           termino: row.termino || null,
           prazo_realizado: row.prazo_realizado || null,
-          meio_expediente: row.meio_expediente || false // Salva a nova flag
+          meio_expediente: row.meio_expediente || false 
         };
 
         if (row.id) {
@@ -206,7 +203,6 @@ export function Pdi() {
           }
         }
 
-        // 2. INTEGRAÇÃO: Sincroniza a conclusão automaticamente com o Painel de Status
         if (!row.is_extra) {
           const client = baseClients.find(c => c.empresa === row.empresa);
           if (client) {
@@ -218,13 +214,12 @@ export function Pdi() {
             const currentStatusData = client.status[monthKey];
             const currentVal = typeof currentStatusData === 'object' ? currentStatusData.val : (currentStatusData || 'not_started');
 
-            // Se o PDI foi concluído mas o Painel não está, ou se o PDI foi reaberto e o Painel estava concluído
             if (currentVal !== targetStatus && (isPdiCompleted || currentVal === 'completed')) {
               const newRecord: StatusRecord = { val: targetStatus, resp: activeResponsavel };
               const newStatusObj = { ...client.status, [monthKey]: newRecord };
               
               await supabase.from('clients').update({ status: newStatusObj }).eq('id', client.id);
-              client.status = newStatusObj; // Atualiza cache local
+              client.status = newStatusObj; 
             }
           }
         }
@@ -254,6 +249,13 @@ export function Pdi() {
   const radius = 50;
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - (metrics.avg / 100) * circumference;
+
+  // Variável para saber quantos registros sobraram após a busca
+  const filteredDataCount = localData.filter(row => 
+    !searchTerm || 
+    row.empresa.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    row.atividade.toLowerCase().includes(searchTerm.toLowerCase())
+  ).length;
 
   return (
     <div className="p-6 max-w-[1600px] mx-auto space-y-6">
@@ -328,9 +330,23 @@ export function Pdi() {
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="flex justify-between items-center p-4 border-b border-slate-200 bg-slate-50">
+        {/* NOVO HEADER DO PDI COM CAMPO DE BUSCA */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center p-4 border-b border-slate-200 bg-slate-50 gap-4">
           <h2 className="font-bold text-slate-700 uppercase text-sm tracking-wider">Plano de Ação de {activeResponsavel}</h2>
-          <div className="flex gap-3">
+          
+          <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+            {/* Campo de Busca */}
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+              <input 
+                type="text" 
+                placeholder="Buscar empresa ou ação..." 
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
+              />
+            </div>
+
             <button onClick={handleAddExtra} className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 rounded-lg transition-colors">
               <Plus size={16} /> Adicionar Extra
             </button>
@@ -352,7 +368,7 @@ export function Pdi() {
                   <th className="px-4 py-3 border-r border-slate-300 text-center w-24">Competência</th>
                   <th className="px-3 py-3 border-r border-slate-300 w-32 text-center">Início</th>
                   <th className="px-3 py-3 border-r border-slate-300 w-32 text-center">Término</th>
-                  <th className="px-3 py-3 border-r border-slate-300 w-32 text-center">Prazo Realiz.</th>
+                  <th className="px-3 py-3 border-r border-slate-300 w-[140px] text-center">Prazo Realiz.</th>
                   <th className="px-3 py-3 border-r border-slate-300 w-16 text-center">Status</th>
                   <th className="px-4 py-3 border-r border-slate-300">Observação</th>
                   <th className="px-3 py-3 text-center">Validações / Ações</th>
@@ -360,6 +376,13 @@ export function Pdi() {
               </thead>
               <tbody className="divide-y divide-slate-200">
                 {localData.map((row, index) => {
+                  // Lógica da Busca: se não bater com a pesquisa, retorna null (oculta a linha sem afetar o index)
+                  if (searchTerm && 
+                      !row.empresa.toLowerCase().includes(searchTerm.toLowerCase()) && 
+                      !row.atividade.toLowerCase().includes(searchTerm.toLowerCase())) {
+                    return null;
+                  }
+
                   const light = getTrafficLight(row);
                   return (
                     <tr key={index} className={row.is_extra ? 'bg-indigo-50/30' : 'hover:bg-slate-50'}>
@@ -422,9 +445,11 @@ export function Pdi() {
                     </tr>
                   );
                 })}
-                {localData.length === 0 && !loading && (
+                
+                {/* Mensagem caso a busca não retorne resultados */}
+                {filteredDataCount === 0 && !loading && (
                   <tr>
-                    <td colSpan={9} className="p-8 text-center text-slate-500 font-medium">Nenhum dado encontrado ou cliente associado a este responsável.</td>
+                    <td colSpan={9} className="p-8 text-center text-slate-500 font-medium">Nenhuma empresa ou ação encontrada com o termo "{searchTerm}".</td>
                   </tr>
                 )}
               </tbody>
