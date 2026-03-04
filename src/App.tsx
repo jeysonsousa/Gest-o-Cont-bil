@@ -8,7 +8,7 @@ import { supabase } from './supabase';
 import { Dashboard } from './components/Dashboard';
 import { Pdi } from './components/Pdi';
 import { Produtividade } from './components/Produtividade';
-import { Login } from './components/Login'; // NOVO: Importando a tela de Login
+import { Login } from './components/Login'; 
 import { 
   LayoutDashboard, 
   Target, 
@@ -16,7 +16,7 @@ import {
   ChevronRight, 
   Menu,
   Activity,
-  LogOut // NOVO: Ícone de Sair
+  LogOut 
 } from 'lucide-react';
 
 export default function App() {
@@ -126,9 +126,10 @@ export default function App() {
         )}
       </div>
 
+      {/* Área de Conteúdo Principal */}
       <div className="flex-1 overflow-auto bg-slate-50">
         {currentRoute === 'dashboard' ? (
-          <Dashboard />
+          <Dashboard isAdmin={isAdmin} />
         ) : currentRoute === 'pdi' ? (
           <Pdi />
         ) : (
