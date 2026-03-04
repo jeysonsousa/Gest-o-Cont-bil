@@ -13,6 +13,16 @@ import { supabase } from '../supabase';
 const currentYearNum = new Date().getFullYear();
 const YEARS = Array.from({ length: 5 }, (_, i) => (currentYearNum - 1 + i).toString());
 
+// Lógica de Competência Contábil (Mês Anterior)
+const currentDate = new Date();
+let defaultMonthIndex = currentDate.getMonth() - 1;
+let defaultYearNum = currentDate.getFullYear();
+
+if (defaultMonthIndex < 0) {
+  defaultMonthIndex = 11; // Volta para Dezembro
+  defaultYearNum -= 1;    // Volta um ano
+}
+
 interface DashboardProps {
   isAdmin: boolean;
 }
@@ -36,9 +46,10 @@ export function Dashboard({ isAdmin }: DashboardProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [formData, setFormData] = useState<Partial<Client>>({});
-  const currentMonthIndex = new Date().getMonth();
-  const [activeMonth, setActiveMonth] = useState<string>(MONTHS[currentMonthIndex]);
-  const [activeYear, setActiveYear] = useState<string>(currentYearNum.toString());
+  
+  // Inicia com o mês contábil correto
+  const [activeMonth, setActiveMonth] = useState<string>(MONTHS[defaultMonthIndex]);
+  const [activeYear, setActiveYear] = useState<string>(defaultYearNum.toString());
 
   useEffect(() => {
     async function fetchData() {
@@ -163,12 +174,10 @@ export function Dashboard({ isAdmin }: DashboardProps) {
 
   const handleExportCSV = () => {
     const headers = ['Responsável', 'Empresa', 'Atividade', 'Prioridade', 'Tributação', 'Tempo Est. (Dias)', 'Status Empresa'];
-    
     const rows = filteredAndSortedClients.map(c => {
       let statusEmpresa = 'Ativa';
       if (c.is_inactive) statusEmpresa = 'Inativa (Ex-cliente)';
       else if (c.sem_movimento) statusEmpresa = 'Sem Movimento';
-
       return [
         c.responsavel || '', c.empresa || '', c.atividade || '', c.prioridade || '', c.tributacao || '', c.tempo_estimado?.toString() || '0', statusEmpresa
       ];
@@ -212,11 +221,9 @@ export function Dashboard({ isAdmin }: DashboardProps) {
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-600 font-medium">Carregando painel de gestão...</div>;
 
   return (
-    // ESTRUTURA FLEX H-FULL: Prende a tela ao tamanho do navegador para a barra não sumir
     <div className="h-full bg-slate-50 p-4 md:p-6 flex flex-col min-h-[600px] overflow-hidden">
       <div className="max-w-[1600px] w-full mx-auto flex flex-col flex-1 min-h-0 gap-4">
         
-        {/* Header Superior - (shrink-0 impede que ele seja esmagado) */}
         <div className="shrink-0 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
           <div>
             <h1 className="text-2xl font-bold text-slate-800">Painel de Status Contábil</h1>
@@ -247,7 +254,6 @@ export function Dashboard({ isAdmin }: DashboardProps) {
                 <button onClick={handleExportCSV} className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-lg font-medium transition-colors shadow-sm" title="Exportar dados cadastrais">
                   <Download size={18} /> Exportar
                 </button>
-                {/* O Laranja Focado na Ação Principal */}
                 <button onClick={() => handleOpenModal()} className="flex items-center gap-2 bg-[#F26522] hover:bg-[#d9551c] text-white px-4 py-2 rounded-lg font-bold transition-colors shadow-sm">
                   <Plus size={18} /> Novo Cliente
                 </button>
@@ -298,7 +304,6 @@ export function Dashboard({ isAdmin }: DashboardProps) {
               </div>
             </div>
 
-            {/* TABELA COM OVERFLOW LOCAL E FUNDO SÓLIDO (BG-WHITE) PARA ESCONDER ROLAGEM */}
             <div className="flex-1 min-h-0 bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col relative">
               <div className="overflow-auto w-full h-full scrollbar-thin scrollbar-thumb-slate-300 rounded-2xl">
                 <table className="w-full text-left text-sm whitespace-nowrap border-collapse">
@@ -307,7 +312,6 @@ export function Dashboard({ isAdmin }: DashboardProps) {
                       <th className="px-4 py-3 sticky left-0 z-50 bg-slate-50 w-32 border-r border-slate-200 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('responsavel')}>
                         <div className="flex items-center gap-1">Responsável <ArrowUpDown size={14} className="text-slate-400"/></div>
                       </th>
-                      {/* SOBREPOSIÇÃO RESOLVIDA: Sombra lateral projeta sobre as outras colunas */}
                       <th className="px-4 py-3 sticky left-[128px] z-50 bg-slate-50 w-[200px] border-r border-slate-200 shadow-[6px_0px_8px_-4px_rgba(0,0,0,0.1)] cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('empresa')}>
                         <div className="flex items-center gap-1">Empresa <ArrowUpDown size={14} className="text-slate-400"/></div>
                       </th>
@@ -332,8 +336,6 @@ export function Dashboard({ isAdmin }: DashboardProps) {
                   <tbody className="divide-y divide-slate-100">
                     {filteredAndSortedClients.map((client) => (
                       <tr key={client.id} className={`hover:bg-slate-50 transition-colors group ${client.is_inactive ? 'bg-red-50/30' : client.sem_movimento ? 'opacity-60 bg-slate-50' : 'bg-white'}`}>
-                        
-                        {/* FUNDO BRANCO OBRIGATÓRIO AQUI PARA NÃO FICAR TRANSPARENTE NA ROLAGEM */}
                         <td className={`px-4 py-3 sticky left-0 z-30 font-medium text-slate-700 border-r border-slate-100 transition-colors ${client.is_inactive ? 'bg-red-50 group-hover:bg-red-100' : 'bg-white group-hover:bg-slate-50'}`}>
                           {client.responsavel}
                         </td>
@@ -343,7 +345,6 @@ export function Dashboard({ isAdmin }: DashboardProps) {
                             {client.is_inactive && <span className="bg-red-100 text-red-700 text-[10px] font-bold px-2 py-0.5 rounded-md">INATIVO</span>}
                           </div>
                         </td>
-
                         <td className="px-4 py-3 text-center border-r border-slate-100">
                           <input type="checkbox" checked={client.sem_movimento || false} onChange={(e) => handleToggleSemMovimento(client.id, e.target.checked)} className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer" title="Marcar como Sem Movimento" />
                         </td>
