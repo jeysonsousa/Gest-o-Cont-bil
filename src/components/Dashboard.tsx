@@ -13,7 +13,6 @@ import { supabase } from '../supabase';
 const currentYearNum = new Date().getFullYear();
 const YEARS = Array.from({ length: 5 }, (_, i) => (currentYearNum - 1 + i).toString());
 
-// Lógica de Competência Contábil
 const currentDate = new Date();
 let defaultMonthIndex = currentDate.getMonth() - 1;
 let defaultYearNum = currentDate.getFullYear();
@@ -25,9 +24,10 @@ if (defaultMonthIndex < 0) {
 
 interface DashboardProps {
   isAdmin: boolean;
+  currentDepartment: string;
 }
 
-export function Dashboard({ isAdmin }: DashboardProps) {
+export function Dashboard({ isAdmin, currentDepartment }: DashboardProps) {
   const [clients, setClients] = useState<Client[]>([]);
   const [settings, setSettings] = useState<AppSettings>({
     responsaveis: [], atividades: [], prioridades: [], tributacoes: [], empresas: []
@@ -50,12 +50,18 @@ export function Dashboard({ isAdmin }: DashboardProps) {
   const [activeMonth, setActiveMonth] = useState<string>(MONTHS[defaultMonthIndex]);
   const [activeYear, setActiveYear] = useState<string>(defaultYearNum.toString());
 
+  // RECARREGA OS CLIENTES SEMPRE QUE O DEPARTAMENTO MUDAR
   useEffect(() => {
     async function fetchData() {
       try {
         setLoading(true);
-        const { data: clientsData } = await supabase.from('clients').select('*').order('created_at', { ascending: true });
+        const { data: clientsData } = await supabase.from('clients')
+          .select('*')
+          .eq('departamento', currentDepartment) // Filtro por Departamento
+          .order('created_at', { ascending: true });
+          
         const { data: settingsData } = await supabase.from('settings').select('*').eq('id', 1).single();
+        
         if (clientsData) setClients(clientsData);
         if (settingsData) setSettings(settingsData);
       } catch (error) {
@@ -65,7 +71,7 @@ export function Dashboard({ isAdmin }: DashboardProps) {
       }
     }
     fetchData();
-  }, []);
+  }, [currentDepartment]);
 
   const activeAnalysts = useMemo(() => {
     const list = clients.filter(c => !c.is_inactive).map(c => c.responsavel);
@@ -172,13 +178,13 @@ export function Dashboard({ isAdmin }: DashboardProps) {
   }, [clients, searchTerm, filterResponsavel, filterAtividade, filterPrioridade, filterTributacao, sortConfig, showInactive]);
 
   const handleExportCSV = () => {
-    const headers = ['Responsável', 'Empresa', 'Atividade', 'Prioridade', 'Tributação', 'Tempo Est. (Dias)', 'Status Empresa'];
+    const headers = ['Responsável', 'Empresa', 'Atividade', 'Prioridade', 'Tributação', 'Tempo Est. (Dias)', 'Status Empresa', 'Departamento'];
     const rows = filteredAndSortedClients.map(c => {
       let statusEmpresa = 'Ativa';
       if (c.is_inactive) statusEmpresa = 'Inativa (Ex-cliente)';
       else if (c.sem_movimento) statusEmpresa = 'Sem Movimento';
       return [
-        c.responsavel || '', c.empresa || '', c.atividade || '', c.prioridade || '', c.tributacao || '', c.tempo_estimado?.toString() || '0', statusEmpresa
+        c.responsavel || '', c.empresa || '', c.atividade || '', c.prioridade || '', c.tributacao || '', c.tempo_estimado?.toString() || '0', statusEmpresa, c.departamento || currentDepartment
       ];
     });
 
@@ -188,7 +194,7 @@ export function Dashboard({ isAdmin }: DashboardProps) {
     const link = document.createElement('a');
     link.href = url;
     const dateStr = new Date().toISOString().split('T')[0];
-    link.setAttribute('download', `base_clientes_${dateStr}.csv`);
+    link.setAttribute('download', `base_clientes_${currentDepartment}_${dateStr}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -200,24 +206,27 @@ export function Dashboard({ isAdmin }: DashboardProps) {
       setFormData(client);
     } else {
       setEditingClient(null);
-      setFormData({ responsavel: '', empresa: '', atividade: '', prioridade: 'A', tributacao: '', sem_movimento: false, is_inactive: false, tempo_estimado: 0, status: {} });
+      // Já injeta o departamento atual ao criar um novo cliente
+      setFormData({ responsavel: '', empresa: '', atividade: '', prioridade: 'A', tributacao: '', sem_movimento: false, is_inactive: false, tempo_estimado: 0, status: {}, departamento: currentDepartment });
     }
     setIsModalOpen(true);
   };
 
   const handleSaveClient = async (e: React.FormEvent) => {
     e.preventDefault();
+    const payload = { ...formData, departamento: currentDepartment }; // Garante a gravação no departamento correto
+    
     if (editingClient) {
-      const { error } = await supabase.from('clients').update(formData).eq('id', editingClient.id);
-      if (!error) setClients(clients.map(c => c.id === editingClient.id ? { ...c, ...formData } as Client : c));
+      const { error } = await supabase.from('clients').update(payload).eq('id', editingClient.id);
+      if (!error) setClients(clients.map(c => c.id === editingClient.id ? { ...c, ...payload } as Client : c));
     } else {
-      const { data, error } = await supabase.from('clients').insert([formData]).select();
+      const { data, error } = await supabase.from('clients').insert([payload]).select();
       if (!error && data) setClients([...clients, data[0] as Client]);
     }
     setIsModalOpen(false);
   }
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-600 font-medium">Carregando painel de gestão...</div>;
+  if (loading) return <div className="min-h-screen flex items-center justify-center bg-slate-50 text-[#2563eb] font-bold">Carregando {currentDepartment}...</div>;
 
   return (
     <div className="h-full bg-slate-50 p-4 md:p-6 flex flex-col min-h-[600px] overflow-hidden">
@@ -225,7 +234,7 @@ export function Dashboard({ isAdmin }: DashboardProps) {
         
         <div className="shrink-0 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
           <div>
-            <h1 className="text-2xl font-bold text-slate-800">Painel de Status Contábil</h1>
+            <h1 className="text-2xl font-bold text-slate-800">Painel de Status: <span className="text-[#2563eb]">{currentDepartment}</span></h1>
             <p className="text-slate-500 text-sm mt-1">Gestão de clientes e atividades da equipe</p>
           </div>
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
@@ -454,7 +463,6 @@ export function Dashboard({ isAdmin }: DashboardProps) {
                 </div>
               </div>
               
-              {/* NOVA SEÇÃO DE CHECKBOXES RESTAURADA */}
               <div className="flex flex-col gap-2 pt-2">
                 <div className="flex items-center gap-2 bg-slate-50 p-3 rounded-lg border border-slate-200">
                   <input type="checkbox" id="sem_movimento" checked={formData.sem_movimento || false} onChange={(e) => setFormData({...formData, sem_movimento: e.target.checked})} className="w-4 h-4 text-[#2563eb] rounded border-slate-300 cursor-pointer focus:ring-[#2563eb]" />
