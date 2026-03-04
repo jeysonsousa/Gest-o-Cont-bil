@@ -231,8 +231,8 @@ export function Dashboard() {
             {activeTab === 'dashboard' && (
               <div className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200">
                 <label className="text-sm font-medium text-slate-600">Período:</label>
-                <select value={activeMonth} onChange={(e) => setActiveMonth(e.target.value)} className="bg-transparent text-sm font-bold text-slate-800 focus:outline-none cursor-pointer">
-                  {MONTHS.map(m => <option key={m} value={m}>{m.toUpperCase()}</option>)}
+                <select value={activeMonth} onChange={(e) => setActiveMonth(e.target.value)} className="bg-transparent text-sm font-bold text-slate-800 focus:outline-none cursor-pointer uppercase">
+                  {MONTHS.map(m => <option key={m} value={m}>{m}</option>)}
                 </select>
                 <span className="text-slate-300">/</span>
                 <select value={activeYear} onChange={(e) => setActiveYear(e.target.value)} className="bg-transparent text-sm font-bold text-slate-800 focus:outline-none cursor-pointer">
@@ -257,8 +257,9 @@ export function Dashboard() {
           </div>
         </div>
 
+        {/* CORREÇÃO 1: Adicionado o "async / await" no salvamento das configurações */}
         {activeTab === 'settings' ? (
-          <SettingsPanel settings={settings} setSettings={(s) => { setSettings(s); supabase.from('settings').update(s).eq('id', 1); }} />
+          <SettingsPanel settings={settings} setSettings={async (s) => { setSettings(s); await supabase.from('settings').update(s).eq('id', 1); }} />
         ) : (
           <>
             {/* Metrics */}
@@ -373,7 +374,20 @@ export function Dashboard() {
                         <td className="px-4 py-3 text-right">
                           <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                             <button onClick={() => handleOpenModal(client)} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors" title="Editar"><Edit2 size={16} /></button>
-                            <button onClick={() => { if(window.confirm('Excluir definitivamente este cliente?')) { supabase.from('clients').delete().eq('id', client.id); setClients(clients.filter(c => c.id !== client.id)); } }} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors" title="Excluir"><Trash2 size={16} /></button>
+                            
+                            {/* CORREÇÃO 2: Adicionado o "async / await" na exclusão do cliente */}
+                            <button 
+                              onClick={async () => { 
+                                if(window.confirm('Excluir definitivamente este cliente?')) { 
+                                  await supabase.from('clients').delete().eq('id', client.id); 
+                                  setClients(clients.filter(c => c.id !== client.id)); 
+                                } 
+                              }} 
+                              className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors" title="Excluir"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                            
                           </div>
                         </td>
                       </tr>
@@ -440,7 +454,6 @@ export function Dashboard() {
                 </div>
               </div>
               
-              {/* NOVA LINHA: Tributação e Tempo Estimado Lado a Lado */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Tributação</label>
