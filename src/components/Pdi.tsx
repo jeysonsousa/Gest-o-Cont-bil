@@ -22,13 +22,11 @@ if (defaultMonthIndex < 0) {
 }
 
 export function Pdi() {
-  // 1. Estados de Autenticação Autossuficientes (Blindagem Restaurada)
   const [isAdmin, setIsAdmin] = useState(false);
   const [userEmail, setUserEmail] = useState('');
   const [authLoaded, setAuthLoaded] = useState(false);
   const [debugUsuarios, setDebugUsuarios] = useState<UsuarioConfig[]>([]);
 
-  // 2. Inicia com o mês contábil correto (Mês Anterior)
   const [activeMonth, setActiveMonth] = useState<string>(MONTHS[defaultMonthIndex]);
   const [activeYear, setActiveYear] = useState<string>(defaultYearNum.toString());
   const [activeResponsavel, setActiveResponsavel] = useState<string>('');
@@ -41,7 +39,6 @@ export function Pdi() {
   const [saving, setSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
-  // 3. Verifica quem está logado DIRETAMENTE no banco
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       const email = data.session?.user.email?.toLowerCase().trim() || '';
@@ -51,7 +48,6 @@ export function Pdi() {
     });
   }, []);
 
-  // 4. Carrega as Regras e Configurações
   useEffect(() => {
     if (!authLoaded) return;
 
@@ -91,7 +87,6 @@ export function Pdi() {
     fetchRoles();
   }, [authLoaded, isAdmin, userEmail]);
 
-  // 5. Busca os dados do PDI
   useEffect(() => {
     async function fetchPdiData() {
       if (!activeResponsavel) {
@@ -299,6 +294,7 @@ export function Pdi() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex">
               
+              {/* Degradê Azul VSM (ÍNDIGO) */}
               <div className="bg-gradient-to-br from-indigo-700 to-indigo-900 text-white p-6 w-48 flex flex-col items-center justify-center text-center shadow-inner">
                 <PieChart size={32} className="mb-2 opacity-80" />
                 <span className="font-bold text-sm uppercase tracking-wider">Evolução<br/>Mensal</span>
@@ -322,6 +318,7 @@ export function Pdi() {
             </div>
 
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
+              {/* Título restaurado para ÍNDIGO */}
               <div className="bg-slate-100 text-indigo-900 font-black p-3 text-center text-sm border-b border-slate-200">
                 ANÁLISE DE DESEMPENHO
               </div>
@@ -355,8 +352,8 @@ export function Pdi() {
                 <button onClick={handleAddExtra} className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-600 bg-slate-50 border border-slate-200 hover:bg-slate-100 rounded-lg transition-colors">
                   <Plus size={16} /> Adicionar Extra
                 </button>
-                {/* Botão de Salvar restaurado para Verde Esmeralda */}
-                <button onClick={handleSave} disabled={saving} className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors disabled:opacity-50">
+                {/* Botão de Salvar Verde Esmeralda */}
+                <button onClick={handleSave} disabled={saving} className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors disabled:opacity-50 shadow-sm">
                   <Save size={16} /> {saving ? 'Salvando...' : 'Salvar PDI'}
                 </button>
               </div>
@@ -387,7 +384,10 @@ export function Pdi() {
                       return (
                         <tr key={index} className={row.is_extra ? 'bg-slate-50/50' : 'hover:bg-slate-50'}>
                           <td className="p-1 border-r border-slate-200"><input type="text" value={row.empresa} onChange={(e) => handleInputChange(index, 'empresa', e.target.value)} disabled={!row.is_extra} className={`w-full p-2 outline-none uppercase font-bold text-xs ${!row.is_extra ? 'bg-transparent text-slate-700' : 'bg-white border border-slate-300 rounded'}`} placeholder="NOME DA EMPRESA" /></td>
+                          
+                          {/* Texto da Ação na cor ÍNDIGO VSM */}
                           <td className="p-1 border-r border-slate-200"><input type="text" value={row.atividade} onChange={(e) => handleInputChange(index, 'atividade', e.target.value)} className="w-full p-2 outline-none bg-transparent text-indigo-700 font-bold text-xs" placeholder="Qual a ação?" /></td>
+                          
                           <td className="p-1 border-r border-slate-200 text-center"><input type="text" value={row.competencia} onChange={(e) => handleInputChange(index, 'competencia', e.target.value)} className="w-full p-2 outline-none bg-transparent text-slate-500 text-xs text-center" /></td>
                           <td className="p-1 border-r border-slate-200"><input type="date" value={row.inicio || ''} onChange={(e) => handleInputChange(index, 'inicio', e.target.value)} className="w-full p-1.5 outline-none bg-white border border-slate-200 rounded text-xs text-slate-600 focus:ring-1 focus:ring-indigo-500/20" /></td>
                           <td className="p-1 border-r border-slate-200"><input type="date" value={row.termino || ''} onChange={(e) => handleInputChange(index, 'termino', e.target.value)} className="w-full p-1.5 outline-none bg-white border border-slate-200 rounded text-xs text-slate-600 focus:ring-1 focus:ring-indigo-500/20" /></td>
@@ -404,6 +404,7 @@ export function Pdi() {
                           <td className="p-1 border-r border-slate-200"><input type="text" value={row.observacao} onChange={(e) => handleInputChange(index, 'observacao', e.target.value)} className="w-full p-2 outline-none bg-transparent text-xs text-slate-600" placeholder="Insira uma nota..." /></td>
                           <td className="p-1 text-center">
                             <div className="flex items-center justify-center gap-2">
+                              {/* Botões de validação com fundo ÍNDIGO E ESMERALDA */}
                               <button onClick={() => handleAnalystConfirm(index)} className={`p-1.5 rounded-md transition-colors ${row.status === 'analyst' || row.status === 'ok' ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`} title={row.status === 'n' ? "Finalizar Tarefa (Analista)" : "Tarefa Finalizada"}><Check size={16} /></button>
                               <button onClick={() => handleManagerConfirm(index)} disabled={row.status === 'n' || !isAdmin} className={`p-1.5 rounded-md transition-colors ${row.status === 'ok' ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'} disabled:opacity-30 disabled:cursor-not-allowed`} title={row.status === 'ok' ? "Validado pelo Gestor" : isAdmin ? "Validar (Gestor)" : "Apenas o Gestor pode validar"}><CheckCheck size={16} /></button>
                               {row.is_extra && <button onClick={() => handleDeleteExtra(index)} className="p-1.5 text-red-500 hover:bg-red-50 rounded" title="Excluir Extra"><Trash2 size={16} /></button>}
