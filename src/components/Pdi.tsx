@@ -6,17 +6,19 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../supabase';
 import { PdiEntry, Client, AppSettings, MONTHS, Status, StatusRecord, UsuarioConfig } from '../types';
-import { Save, Plus, Trash2, Target, Check, CheckCheck, Search } from 'lucide-react';
+import { Save, Plus, Trash2, Target, Check, CheckCheck, Search, ShieldAlert } from 'lucide-react';
 
 const currentYearNum = new Date().getFullYear();
 const YEARS = Array.from({ length: 5 }, (_, i) => (currentYearNum - 1 + i).toString());
 
-interface PdiProps {
-  isAdmin: boolean;
-  userEmail: string;
-}
+export function Pdi() {
+  // Estados de Autenticação Autossuficientes
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [userEmail, setUserEmail] = useState('');
+  const [authLoaded, setAuthLoaded] = useState(false);
+  const [debugUsuarios, setDebugUsuarios] = useState<UsuarioConfig[]>([]);
 
-export function Pdi({ isAdmin, userEmail }: PdiProps) {
+  // Estados Globais
   const [activeMonth, setActiveMonth] = useState<string>(MONTHS[new Date().getMonth()]);
   const [activeYear, setActiveYear] = useState<string>(currentYearNum.toString());
   const [activeResponsavel, setActiveResponsavel] = useState<string>('');
@@ -29,49 +31,65 @@ export function Pdi({ isAdmin, userEmail }: PdiProps) {
   const [saving, setSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
+  // 1. Verifica quem está logado diretamente no Supabase (Blindagem de Segurança)
   useEffect(() => {
-    async function fetchData() {
+    supabase.auth.getSession().then(({ data }) => {
+      const email = data.session?.user.email?.toLowerCase().trim() || '';
+      setUserEmail(email);
+      setIsAdmin(email === 'jeyson@vsmweb.com.br');
+      setAuthLoaded(true);
+    });
+  }, []);
+
+  // 2. Carrega as Configurações e Define as Permissões
+  useEffect(() => {
+    if (!authLoaded) return;
+
+    async function fetchRoles() {
       const { data: settingsData } = await supabase.from('settings').select('*').eq('id', 1).single();
+      const { data: clientsData } = await supabase.from('clients').select('responsavel, is_inactive, sem_movimento');
       
       if (settingsData) {
         setSettings(settingsData);
         
-        const usuariosConfig: UsuarioConfig[] = settingsData.usuarios || [];
-        const { data: clientsData } = await supabase.from('clients').select('responsavel, is_inactive, sem_movimento');
+        // Garante que o JSON de usuários seja lido corretamente
+        let rawUsuarios = settingsData.usuarios || [];
+        if (typeof rawUsuarios === 'string') {
+          try { rawUsuarios = JSON.parse(rawUsuarios); } catch(e) { rawUsuarios = []; }
+        }
+        const usuariosConfig: UsuarioConfig[] = rawUsuarios;
+        setDebugUsuarios(usuariosConfig); // Salva para o autodiagnóstico
         
-        if (clientsData) {
-          const list = clientsData.filter(c => !c.is_inactive).map(c => c.responsavel);
-          
-          let allowedAnalysts: string[] = [];
-          
-          if (!isAdmin) {
-            const loggedUserConfig = usuariosConfig.find(u => u.email.toLowerCase() === userEmail.toLowerCase());
-            
-            if (loggedUserConfig) {
-              // CORREÇÃO: O analista logado SEMPRE terá acesso a ele mesmo, mesmo que ainda não tenha clientes.
-              allowedAnalysts = [loggedUserConfig.nome.toUpperCase()];
-            } else {
-              allowedAnalysts = [];
-            }
+        const list = (clientsData || []).filter(c => !c.is_inactive).map(c => c.responsavel);
+        let allowedAnalysts: string[] = [];
+        
+        if (isAdmin) {
+          // ADMIN: Vê todos os analistas (cadastrados nas configs + os que já têm clientes)
+          const configuredNames = usuariosConfig.map(u => u.nome.toUpperCase());
+          allowedAnalysts = [...new Set([...list.map(n => n.toUpperCase()), ...configuredNames])].sort();
+        } else {
+          // ANALISTA: Procura o e-mail exato dele nas configurações
+          const myConfig = usuariosConfig.find(u => u.email.toLowerCase().trim() === userEmail);
+          if (myConfig) {
+            allowedAnalysts = [myConfig.nome.toUpperCase()];
           } else {
-            // CORREÇÃO: O Admin pode ver todos os analistas (os que já têm clientes E os que estão só nas configurações)
-            const configuredNames = usuariosConfig.map(u => u.nome.toUpperCase());
-            allowedAnalysts = [...new Set([...list.map(n => n.toUpperCase()), ...configuredNames])].sort();
+            allowedAnalysts = [];
           }
-          
-          setActiveAnalysts(allowedAnalysts);
-          
-          if (allowedAnalysts.length > 0 && !activeResponsavel) {
-            setActiveResponsavel(allowedAnalysts[0]);
-          } else if (allowedAnalysts.length === 0 && !isAdmin) {
-            setActiveResponsavel('');
-          }
+        }
+        
+        setActiveAnalysts(allowedAnalysts);
+        
+        if (allowedAnalysts.length > 0) {
+          setActiveResponsavel(allowedAnalysts[0]);
+        } else {
+          setActiveResponsavel('');
         }
       }
     }
-    fetchData();
-  }, [activeResponsavel, isAdmin, userEmail]);
+    fetchRoles();
+  }, [authLoaded, isAdmin, userEmail]);
 
+  // 3. Carrega os Dados do PDI daquele Responsável
   useEffect(() => {
     async function fetchPdiData() {
       if (!activeResponsavel) {
@@ -83,17 +101,8 @@ export function Pdi({ isAdmin, userEmail }: PdiProps) {
       setSearchTerm(''); 
 
       try {
-        const { data: clientsData } = await supabase
-          .from('clients')
-          .select('*')
-          .eq('responsavel', activeResponsavel);
-
-        const { data: pdiData } = await supabase
-          .from('pdi_entries')
-          .select('*')
-          .eq('responsavel', activeResponsavel)
-          .eq('mes', activeMonth)
-          .eq('ano', activeYear);
+        const { data: clientsData } = await supabase.from('clients').select('*').eq('responsavel', activeResponsavel);
+        const { data: pdiData } = await supabase.from('pdi_entries').select('*').eq('responsavel', activeResponsavel).eq('mes', activeMonth).eq('ano', activeYear);
 
         const clients = clientsData || [];
         const dbEntries = pdiData || [];
@@ -152,29 +161,16 @@ export function Pdi({ isAdmin, userEmail }: PdiProps) {
 
   const handleAddExtra = () => {
     setLocalData([...localData, {
-      responsavel: activeResponsavel,
-      empresa: '',
-      atividade: '',
-      competencia: `${activeMonth}/${activeYear}`,
-      inicio: '',
-      termino: '',
-      prazo_realizado: '',
-      meio_expediente: false,
-      percentual: 0,
-      status: 'n',
-      observacao: '',
-      mes: activeMonth,
-      ano: activeYear,
-      is_extra: true
+      responsavel: activeResponsavel, empresa: '', atividade: '', competencia: `${activeMonth}/${activeYear}`,
+      inicio: '', termino: '', prazo_realizado: '', meio_expediente: false, percentual: 0, status: 'n',
+      observacao: '', mes: activeMonth, ano: activeYear, is_extra: true
     }]);
   };
 
   const handleDeleteExtra = async (index: number) => {
     const row = localData[index];
     if (window.confirm('Excluir esta atividade extra?')) {
-      if (row.id) {
-        await supabase.from('pdi_entries').delete().eq('id', row.id);
-      }
+      if (row.id) await supabase.from('pdi_entries').delete().eq('id', row.id);
       const newData = [...localData];
       newData.splice(index, 1);
       setLocalData(newData);
@@ -184,12 +180,9 @@ export function Pdi({ isAdmin, userEmail }: PdiProps) {
   const handleAnalystConfirm = (index: number) => {
     const newData = [...localData];
     const row = newData[index];
-    
     if (row.status === 'n') {
       newData[index].status = 'analyst';
-      if (!row.prazo_realizado) {
-        newData[index].prazo_realizado = new Date().toISOString().split('T')[0];
-      }
+      if (!row.prazo_realizado) newData[index].prazo_realizado = new Date().toISOString().split('T')[0];
     } else {
       newData[index].status = 'n';
     }
@@ -199,12 +192,8 @@ export function Pdi({ isAdmin, userEmail }: PdiProps) {
   const handleManagerConfirm = (index: number) => {
     const newData = [...localData];
     const row = newData[index];
-    
-    if (row.status === 'analyst') {
-      newData[index].status = 'ok';
-    } else if (row.status === 'ok') {
-      newData[index].status = 'analyst';
-    }
+    if (row.status === 'analyst') newData[index].status = 'ok';
+    else if (row.status === 'ok') newData[index].status = 'analyst';
     setLocalData(newData);
   };
 
@@ -221,14 +210,10 @@ export function Pdi({ isAdmin, userEmail }: PdiProps) {
         };
 
         if (row.id) {
-          const { error } = await supabase.from('pdi_entries').update(dbRow).eq('id', row.id);
-          if (error) console.error('Erro no update:', error);
+          await supabase.from('pdi_entries').update(dbRow).eq('id', row.id);
         } else {
           const { data, error } = await supabase.from('pdi_entries').insert([dbRow]).select();
-          if (error) console.error('Erro no insert:', error);
-          if (!error && data) {
-            row.id = data[0].id;
-          }
+          if (!error && data) row.id = data[0].id;
         }
 
         if (!row.is_extra) {
@@ -236,16 +221,13 @@ export function Pdi({ isAdmin, userEmail }: PdiProps) {
           if (client) {
             const monthKey = `${activeMonth}-${activeYear}`;
             const isPdiCompleted = row.status === 'analyst' || row.status === 'ok';
-            
             const targetStatus: Status = isPdiCompleted ? 'completed' : 'pending';
-            
             const currentStatusData = client.status[monthKey];
             const currentVal = typeof currentStatusData === 'object' ? currentStatusData.val : (currentStatusData || 'not_started');
 
             if (currentVal !== targetStatus && (isPdiCompleted || currentVal === 'completed')) {
               const newRecord: StatusRecord = { val: targetStatus, resp: activeResponsavel };
               const newStatusObj = { ...client.status, [monthKey]: newRecord };
-              
               await supabase.from('clients').update({ status: newStatusObj }).eq('id', client.id);
               client.status = newStatusObj; 
             }
@@ -254,7 +236,6 @@ export function Pdi({ isAdmin, userEmail }: PdiProps) {
       }
       alert('PDI Salvo e Painel de Status Sincronizado com sucesso!');
     } catch (error) {
-      console.error('Erro ao salvar:', error);
       alert('Erro ao salvar o PDI.');
     } finally {
       setSaving(false);
@@ -263,13 +244,9 @@ export function Pdi({ isAdmin, userEmail }: PdiProps) {
 
   const getTrafficLight = (row: PdiEntry) => {
     if (row.status === 'n') return { color: 'bg-gray-200', title: 'Pendente' };
-    
     if (row.termino && row.prazo_realizado) {
-      if (row.prazo_realizado <= row.termino) {
-        return { color: 'bg-emerald-500', title: 'Concluído no Prazo' };
-      } else {
-        return { color: 'bg-red-500', title: 'Concluído Fora do Prazo' };
-      }
+      if (row.prazo_realizado <= row.termino) return { color: 'bg-emerald-500', title: 'Concluído no Prazo' };
+      else return { color: 'bg-red-500', title: 'Concluído Fora do Prazo' };
     }
     return { color: 'bg-emerald-500', title: 'Concluído' };
   };
@@ -283,6 +260,8 @@ export function Pdi({ isAdmin, userEmail }: PdiProps) {
     row.empresa.toLowerCase().includes(searchTerm.toLowerCase()) || 
     row.atividade.toLowerCase().includes(searchTerm.toLowerCase())
   ).length;
+
+  if (!authLoaded) return <div className="p-8 text-center font-bold text-slate-500">Autenticando painel...</div>;
 
   return (
     <div className="p-6 max-w-[1600px] mx-auto space-y-6">
@@ -315,13 +294,27 @@ export function Pdi({ isAdmin, userEmail }: PdiProps) {
         </div>
       </div>
 
+      {/* TELA DE AUTODIAGNÓSTICO E BLOQUEIO */}
       {activeAnalysts.length === 0 && !isAdmin ? (
-        <div className="bg-amber-50 p-8 rounded-2xl border border-amber-200 text-center">
-          <h3 className="text-amber-800 font-bold text-lg">Acesso Restrito</h3>
-          <p className="text-amber-700 mt-2">
-            Seu e-mail de acesso não foi vinculado a nenhum analista nas configurações.<br/>
-            Solicite ao Administrador Geral que cadastre seu e-mail no painel de Configurações.
+        <div className="bg-amber-50 p-8 rounded-2xl border border-amber-200 text-center max-w-2xl mx-auto mt-10">
+          <ShieldAlert className="mx-auto text-amber-500 mb-4" size={48} />
+          <h3 className="text-amber-800 font-bold text-xl">Acesso Restrito</h3>
+          <p className="text-amber-700 mt-2 font-medium">
+            Seu e-mail não foi encontrado na base de analistas autorizados.
           </p>
+          <div className="mt-6 bg-white p-4 rounded-xl border border-amber-100 text-left">
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-widest border-b border-slate-100 pb-2 mb-3">Diagnóstico do Sistema</p>
+            <p className="text-sm text-slate-700"><strong>Seu E-mail de login:</strong> <span className="text-indigo-600">{userEmail}</span></p>
+            <p className="text-sm text-slate-700 mt-2"><strong>Analistas cadastrados pelo Admin:</strong> {debugUsuarios.length}</p>
+            {debugUsuarios.length > 0 && (
+              <ul className="mt-2 space-y-1">
+                {debugUsuarios.map((u, i) => (
+                  <li key={i} className="text-xs text-slate-500 font-mono bg-slate-50 p-1 rounded">• Nome: {u.nome} | E-mail: {u.email}</li>
+                ))}
+              </ul>
+            )}
+            <p className="text-xs text-amber-600 mt-4 font-medium italic">* Peça ao Administrador para cadastrar seu e-mail exatamente como aparece acima na aba Configurações.</p>
+          </div>
         </div>
       ) : (
         <>
