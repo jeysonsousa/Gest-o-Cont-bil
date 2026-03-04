@@ -11,7 +11,6 @@ import { Save, Plus, Trash2, Target, Check, CheckCheck, Search } from 'lucide-re
 const currentYearNum = new Date().getFullYear();
 const YEARS = Array.from({ length: 5 }, (_, i) => (currentYearNum - 1 + i).toString());
 
-// Recebendo as props de controle de acesso
 interface PdiProps {
   isAdmin: boolean;
   userEmail: string;
@@ -37,29 +36,27 @@ export function Pdi({ isAdmin, userEmail }: PdiProps) {
       if (settingsData) {
         setSettings(settingsData);
         
-        // RECUPERA A LISTA DE USUÁRIOS (NOME + EMAIL) DAS CONFIGURAÇÕES
         const usuariosConfig: UsuarioConfig[] = settingsData.usuarios || [];
-
         const { data: clientsData } = await supabase.from('clients').select('responsavel, is_inactive, sem_movimento');
         
         if (clientsData) {
-          // Pega todos os responsáveis que têm clientes ativos
           const list = clientsData.filter(c => !c.is_inactive).map(c => c.responsavel);
-          const uniqueAnalysts = [...new Set(list)].sort();
           
-          let allowedAnalysts = uniqueAnalysts;
+          let allowedAnalysts: string[] = [];
           
-          // BLOQUEIO RESTRITO: Compara o e-mail logado com o e-mail cadastrado nas configurações
           if (!isAdmin) {
             const loggedUserConfig = usuariosConfig.find(u => u.email.toLowerCase() === userEmail.toLowerCase());
             
             if (loggedUserConfig) {
-              // Se achou o e-mail, ele só pode ver a carteira dele mesmo
-              allowedAnalysts = uniqueAnalysts.filter(a => a === loggedUserConfig.nome);
+              // CORREÇÃO: O analista logado SEMPRE terá acesso a ele mesmo, mesmo que ainda não tenha clientes.
+              allowedAnalysts = [loggedUserConfig.nome.toUpperCase()];
             } else {
-              // Se o e-mail logado não estiver na lista de usuários configurados, bloqueia tudo
               allowedAnalysts = [];
             }
+          } else {
+            // CORREÇÃO: O Admin pode ver todos os analistas (os que já têm clientes E os que estão só nas configurações)
+            const configuredNames = usuariosConfig.map(u => u.nome.toUpperCase());
+            allowedAnalysts = [...new Set([...list.map(n => n.toUpperCase()), ...configuredNames])].sort();
           }
           
           setActiveAnalysts(allowedAnalysts);
