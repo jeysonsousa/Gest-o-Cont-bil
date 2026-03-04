@@ -301,7 +301,8 @@ export function Pdi() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex">
               
-              <div className="bg-gradient-to-br from-indigo-600 to-indigo-800 text-white p-6 w-48 flex flex-col items-center justify-center text-center shadow-inner">
+              {/* O Card agora está com o gradiente azul corporativo da VSM */}
+              <div className="bg-gradient-to-br from-indigo-700 to-indigo-900 text-white p-6 w-48 flex flex-col items-center justify-center text-center shadow-inner">
                 <PieChart size={32} className="mb-2 opacity-80" />
                 <span className="font-bold text-sm uppercase tracking-wider">Evolução<br/>Mensal</span>
               </div>
