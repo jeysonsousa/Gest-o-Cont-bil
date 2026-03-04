@@ -11,7 +11,6 @@ import { Activity, TrendingUp, Clock, AlertTriangle, ChevronDown, ChevronUp, Use
 const currentYearNum = new Date().getFullYear();
 const YEARS = Array.from({ length: 5 }, (_, i) => (currentYearNum - 1 + i).toString());
 
-// Lógica de Competência Contábil (Mês Anterior)
 const currentDate = new Date();
 let defaultMonthIndex = currentDate.getMonth() - 1;
 let defaultYearNum = currentDate.getFullYear();
@@ -33,7 +32,8 @@ const getBusinessDays = (startDate: string, endDate: string) => {
   return count;
 };
 
-export function Produtividade() {
+// RECEBE O DEPARTAMENTO
+export function Produtividade({ currentDepartment }: { currentDepartment: string }) {
   const [activeMonth, setActiveMonth] = useState<string>(MONTHS[defaultMonthIndex]);
   const [activeYear, setActiveYear] = useState<string>(defaultYearNum.toString());
   
@@ -46,22 +46,36 @@ export function Produtividade() {
     setExpanded(prev => ({ ...prev, [responsavel]: !prev[responsavel] }));
   };
 
+  // CARREGA ANALISTAS DO DEPARTAMENTO
   useEffect(() => {
     async function loadAnalysts() {
-      const { data } = await supabase.from('clients').select('responsavel').eq('is_inactive', false);
+      const { data } = await supabase.from('clients')
+        .select('responsavel')
+        .eq('is_inactive', false)
+        .eq('departamento', currentDepartment);
+        
       if (data) {
         const unique = [...new Set(data.map(d => d.responsavel))].sort();
         setAnalysts(unique);
       }
     }
     loadAnalysts();
-  }, []);
+  }, [currentDepartment]);
 
+  // CARREGA PRODUTIVIDADE DO DEPARTAMENTO
   useEffect(() => {
     async function loadPerformance() {
       setLoading(true);
-      const { data: clients } = await supabase.from('clients').select('empresa, responsavel, tempo_estimado').eq('is_inactive', false);
-      const { data: pdi } = await supabase.from('pdi_entries').select('*').eq('mes', activeMonth).eq('ano', activeYear);
+      const { data: clients } = await supabase.from('clients')
+        .select('empresa, responsavel, tempo_estimado')
+        .eq('is_inactive', false)
+        .eq('departamento', currentDepartment);
+        
+      const { data: pdi } = await supabase.from('pdi_entries')
+        .select('*')
+        .eq('mes', activeMonth)
+        .eq('ano', activeYear)
+        .eq('departamento', currentDepartment);
 
       if (clients && pdi) {
         const metrics = pdi
@@ -88,7 +102,7 @@ export function Produtividade() {
       setLoading(false);
     }
     loadPerformance();
-  }, [activeMonth, activeYear]);
+  }, [activeMonth, activeYear, currentDepartment]);
 
   const { globalStats, analystGroups } = useMemo(() => {
     const validGlobal = performanceData.filter(d => d.estimado > 0);
@@ -112,9 +126,9 @@ export function Produtividade() {
       <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <Activity className="text-indigo-600" /> Indicadores de Produtividade
+            <Activity className="text-[#1e3a8a]" /> Indicadores do {currentDepartment}
           </h1>
-          <p className="text-slate-500 text-sm mt-1">Visão geral do escritório e detalhamento por analista</p>
+          <p className="text-slate-500 text-sm mt-1">Visão geral do setor e detalhamento por analista</p>
         </div>
         <div className="flex items-center gap-4 bg-slate-50 p-2 rounded-xl border border-slate-200">
           <select value={activeMonth} onChange={(e) => setActiveMonth(e.target.value)} className="bg-transparent text-sm font-bold text-slate-800 outline-none uppercase px-2">{MONTHS.map(m => <option key={m} value={m}>{m}</option>)}</select>
@@ -158,7 +172,7 @@ export function Produtividade() {
             <div key={analyst.responsavel} className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden transition-all">
               <div onClick={() => toggleExpand(analyst.responsavel)} className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 cursor-pointer hover:bg-slate-50 select-none">
                 <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-black text-lg">{analyst.responsavel.charAt(0)}</div>
+                  <div className="w-10 h-10 rounded-full bg-[#dbeafe] text-[#1e3a8a] flex items-center justify-center font-black text-lg">{analyst.responsavel.charAt(0)}</div>
                   <div><h3 className="font-bold text-lg text-slate-800">{analyst.responsavel}</h3><p className="text-xs text-slate-500 font-medium">{analyst.totalConcluidas} empresas validadas neste mês</p></div>
                 </div>
                 <div className="flex flex-wrap items-center gap-6">
@@ -191,11 +205,11 @@ export function Produtividade() {
                         <tbody className="divide-y divide-slate-100">
                           {analyst.metrics.map((row: any, idx: number) => (
                             <tr key={idx} className="hover:bg-slate-50 transition-colors group">
-                              <td className="px-6 py-3 font-bold text-slate-800"><div className="flex flex-col"><span>{row.empresa}</span>{row.meioExp && <span className="text-[9px] text-indigo-500 uppercase tracking-widest mt-0.5">Utilizou Meio Expediente (-0,5d)</span>}</div></td>
+                              <td className="px-6 py-3 font-bold text-slate-800"><div className="flex flex-col"><span>{row.empresa}</span>{row.meioExp && <span className="text-[9px] text-[#2563eb] uppercase tracking-widest mt-0.5">Utilizou Meio Expediente (-0,5d)</span>}</div></td>
                               <td className="px-6 py-3 text-center text-slate-600">{row.inicio.split('-').reverse().join('/')}</td>
                               <td className="px-6 py-3 text-center text-slate-600">{row.fim.split('-').reverse().join('/')}</td>
                               <td className="px-6 py-3 text-center font-bold text-slate-600">{row.estimado === 0 ? '-' : `${row.estimado}d`}</td>
-                              <td className="px-6 py-3 text-center font-bold text-indigo-600">{row.realizado}d</td>
+                              <td className="px-6 py-3 text-center font-bold text-[#2563eb]">{row.realizado}d</td>
                               <td className="px-6 py-3 text-right">
                                 {row.estimado === 0 ? (
                                   <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider bg-slate-100 px-2 py-1 rounded">Sem parâmetro</span>
