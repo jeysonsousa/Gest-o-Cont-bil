@@ -5,10 +5,9 @@
 
 export type Status = 'completed' | 'pending' | 'delayed' | 'not_started';
 
-// SOLICITAÇÃO: Registro histórico para auditoria de quem concluiu a tarefa na época
 export interface StatusRecord {
   val: Status;
-  resp: string; // Nome do analista responsável no momento da conclusão
+  resp: string; 
 }
 
 export interface Client {
@@ -16,17 +15,23 @@ export interface Client {
   responsavel: string;
   empresa: string;
   sem_movimento?: boolean;
-  is_inactive?: boolean; // SOLICITAÇÃO: Flag para empresas que deixaram de ser clientes
-  tempo_estimado?: number; // SOLICITAÇÃO: Tempo estimado em dias para conclusão (ex: 0.5, 1, 2)
+  is_inactive?: boolean; 
+  tempo_estimado?: number; 
   atividade: string;
   prioridade: string;
   tributacao: string;
-  // O status agora aceita o formato simples (legado) ou o objeto com histórico
   status: Record<string, Status | StatusRecord>;
 }
 
+// NOVO: Estrutura para vincular o Analista ao E-mail de acesso
+export interface UsuarioConfig {
+  nome: string;
+  email: string;
+}
+
 export interface AppSettings {
-  responsaveis: string[];
+  responsaveis: string[]; // Mantido por retrocompatibilidade
+  usuarios?: UsuarioConfig[]; // NOVO CAMPO DE GESTÃO DE ACESSOS
   atividades: string[];
   prioridades: string[];
   tributacoes: string[];
@@ -41,12 +46,12 @@ export interface PdiEntry {
   id?: string;
   responsavel: string;
   empresa: string;
-  atividade: string; // Coluna "AÇÃO" no layout do PDI
+  atividade: string; 
   competencia: string;
   inicio: string;
   termino: string;
   prazo_realizado: string;
-  meio_expediente?: boolean; // SOLICITAÇÃO: Flag para indicar meio expediente (-0.5 dia)
+  meio_expediente?: boolean; 
   percentual: number;
   status: string;
   observacao: string;
