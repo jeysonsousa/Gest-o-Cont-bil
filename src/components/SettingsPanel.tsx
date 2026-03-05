@@ -416,7 +416,7 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
         {activeTab === 'empresas' && (
           <div className="max-w-6xl animate-fade-in flex flex-col h-full">
             <div className="flex justify-between items-start mb-6">
-              <div><h3 className="text-xl font-bold text-[#1e3a8a]">Cadastro Global de Empresas</h3><p className="text-sm text-slate-500 mt-1">Gerencie a matriz de alocação por departamento e metas.</p></div>
+              <div><h3 className="text-xl font-bold text-[#1e3a8a]">Cadastro de Empresas</h3><p className="text-sm text-slate-500 mt-1">Gerencie a matriz de alocação por departamento e metas.</p></div>
               <button onClick={() => openEmpresaModal()} className="bg-[#2563eb] hover:bg-[#1e3a8a] text-white px-4 py-2 rounded-lg font-bold transition-colors shadow-sm flex items-center gap-2"><Plus size={18} /> Nova Empresa</button>
             </div>
             
