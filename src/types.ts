@@ -45,7 +45,7 @@ export interface UsuarioConfig {
   email: string;
   departamentos?: string[]; 
   isEstagiario?: boolean; 
-  isAdmin?: boolean; // NOVO: Controle dinâmico de Admin
+  isAdmin?: boolean; 
 }
 
 export interface MetaGlobal {
@@ -64,6 +64,7 @@ export interface EmpresaBase {
   nome: string;
   tributacao: string;
   metas_vinculadas?: MetaVinculada[];
+  is_inactive?: boolean; // NOVO: Controle de inativação global
 }
 
 export interface AppSettings {
