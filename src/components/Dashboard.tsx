@@ -89,10 +89,12 @@ export function Dashboard({ isAdmin, currentDepartment }: DashboardProps) {
     return [...new Set(list)].sort();
   }, [clients]);
 
+  // FILTRA PARA MOSTRAR APENAS EMPRESAS ATIVAS NO DROPDOWN
   const empresasDisponiveis = useMemo(() => {
     const alocadas = clients.map(c => c.empresa);
     return (settings.empresas_base || []).filter(e => 
-      !alocadas.includes(e.nome) || (editingClient && editingClient.empresa === e.nome)
+      (!e.is_inactive) && 
+      (!alocadas.includes(e.nome) || (editingClient && editingClient.empresa === e.nome))
     ).sort((a, b) => a.nome.localeCompare(b.nome));
   }, [settings.empresas_base, clients, editingClient]);
 
@@ -237,7 +239,7 @@ export function Dashboard({ isAdmin, currentDepartment }: DashboardProps) {
         ...formData,
         empresa: emp.nome,
         tributacao: emp.tributacao,
-        tempo_estimado: totalTime // Salva o tempo silenciosamente no banco
+        tempo_estimado: totalTime 
       });
     } else {
       setFormData({ ...formData, empresa: '', tributacao: '', tempo_estimado: 0 });
