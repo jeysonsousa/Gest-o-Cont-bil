@@ -29,7 +29,6 @@ const formatDateForSearch = (dateStr?: string) => {
   return dateStr;
 };
 
-// RECEBENDO O DEPARTAMENTO COMO PROP
 export function Pdi({ currentDepartment }: { currentDepartment: string }) {
   const [isAdmin, setIsAdmin] = useState(false);
   const [userEmail, setUserEmail] = useState('');
@@ -60,7 +59,6 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
     });
   }, []);
 
-  // RECARREGA OS ANALISTAS QUANDO O DEPARTAMENTO MUDA
   useEffect(() => {
     if (!authLoaded) return;
 
@@ -68,7 +66,7 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
       const { data: settingsData } = await supabase.from('settings').select('*').eq('id', 1).single();
       const { data: clientsData } = await supabase.from('clients')
         .select('responsavel, is_inactive, sem_movimento, departamento')
-        .eq('departamento', currentDepartment); // Filtra só os analistas do Setor atual
+        .eq('departamento', currentDepartment); 
       
       if (settingsData) {
         setSettings(settingsData);
@@ -102,10 +100,9 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
     fetchRoles();
   }, [authLoaded, isAdmin, userEmail, currentDepartment]);
 
-  // RECARREGA AS METAS QUANDO O DEPARTAMENTO MUDA
   useEffect(() => {
     async function fetchPdiData() {
-      if (!activeResponsavel) {
+      if (!activeResponsavel || !settings) {
         setLocalData([]);
         return;
       }
@@ -132,23 +129,43 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
         const activeClientNames = activeClients.map((c: Client) => c.empresa);
 
         const validDbEntries = dbEntries.filter(e => e.is_extra || activeClientNames.includes(e.empresa));
-        
         const combined: PdiEntry[] = [...validDbEntries];
         setBaseClients(activeClients); 
 
+        // NOVO CÉREBRO: LER METAS VINCULADAS
+        const deptMetasGlobais = (settings.metas_globais || []).filter(m => m.departamento === currentDepartment);
+
         activeClients.forEach((client: Client) => {
-          const exists = validDbEntries.find(e => e.empresa === client.empresa && !e.is_extra);
-          if (!exists) {
-            combined.push({
-              responsavel: activeResponsavel, empresa: client.empresa, atividade: 'Contabilização',
-              competencia: `${activeMonth}/${activeYear}`, inicio: '', termino: '', prazo_realizado: '',
-              meio_expediente: false, percentual: 0, status: 'n', observacao: '',
-              mes: activeMonth, ano: activeYear, is_extra: false, departamento: currentDepartment
+          const empBase = (settings.empresas_base || []).find(e => e.nome === client.empresa);
+          
+          if (empBase && empBase.metas_vinculadas) {
+            // Filtra as metas vinculadas que pertencem ao setor atual
+            const linkedDeptMetas = empBase.metas_vinculadas.filter(mv => deptMetasGlobais.some(dmg => dmg.id === mv.metaId));
+
+            linkedDeptMetas.forEach(mv => {
+              const metaDef = deptMetasGlobais.find(dmg => dmg.id === mv.metaId);
+              if (metaDef) {
+                // Verifica se a meta já foi criada no banco de dados para este mês
+                const exists = validDbEntries.find(e => e.empresa === client.empresa && e.atividade === metaDef.nome && !e.is_extra);
+                
+                if (!exists) {
+                  combined.push({
+                    responsavel: activeResponsavel, empresa: client.empresa, atividade: metaDef.nome,
+                    competencia: `${activeMonth}/${activeYear}`, inicio: '', termino: '', prazo_realizado: '',
+                    meio_expediente: false, percentual: 0, status: 'n', observacao: '',
+                    mes: activeMonth, ano: activeYear, is_extra: false, departamento: currentDepartment
+                  });
+                }
+              }
             });
           }
         });
 
-        combined.sort((a, b) => (a.is_extra === b.is_extra ? 0 : a.is_extra ? 1 : -1));
+        combined.sort((a, b) => {
+          if (a.is_extra !== b.is_extra) return a.is_extra ? 1 : -1;
+          return a.empresa.localeCompare(b.empresa);
+        });
+        
         setLocalData(combined);
       } catch (error) {
         console.error('Erro:', error);
@@ -157,7 +174,7 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
       }
     }
     fetchPdiData();
-  }, [activeMonth, activeYear, activeResponsavel, currentDepartment]);
+  }, [activeMonth, activeYear, activeResponsavel, currentDepartment, settings]);
 
   const metrics = useMemo(() => {
     if (localData.length === 0) return { avg: 0, total: 0, completed: 0 };
@@ -294,7 +311,7 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
     return (
       <tr key={index} className={row.is_extra ? 'bg-slate-50/50' : 'hover:bg-slate-50'}>
         <td className="p-1 border-r border-slate-200"><input type="text" value={row.empresa} onChange={(e) => handleInputChange(index, 'empresa', e.target.value)} disabled={!row.is_extra} className={`w-full p-2 outline-none uppercase font-bold text-xs ${!row.is_extra ? 'bg-transparent text-slate-700' : 'bg-white border border-slate-300 rounded'}`} placeholder="NOME DA EMPRESA" /></td>
-        <td className="p-1 border-r border-slate-200"><input type="text" value={row.atividade} onChange={(e) => handleInputChange(index, 'atividade', e.target.value)} className="w-full p-2 outline-none bg-transparent text-[#1e3a8a] font-bold text-xs" placeholder="Qual a ação?" /></td>
+        <td className="p-1 border-r border-slate-200"><input type="text" value={row.atividade} onChange={(e) => handleInputChange(index, 'atividade', e.target.value)} disabled={!row.is_extra} className={`w-full p-2 outline-none bg-transparent text-[#1e3a8a] font-bold text-xs ${!row.is_extra && 'cursor-not-allowed'}`} placeholder="Qual a ação?" title={!row.is_extra ? 'Ação vinda do Cadastro Global' : ''} /></td>
         <td className="p-1 border-r border-slate-200 text-center"><input type="text" value={row.competencia} onChange={(e) => handleInputChange(index, 'competencia', e.target.value)} className="w-full p-2 outline-none bg-transparent text-slate-500 text-xs text-center" /></td>
         <td className="p-1 border-r border-slate-200"><input type="date" value={row.inicio || ''} onChange={(e) => handleInputChange(index, 'inicio', e.target.value)} className="w-full p-1.5 outline-none bg-white border border-slate-200 rounded text-xs text-slate-600 focus:ring-1 focus:ring-[#2563eb]/20" /></td>
         <td className="p-1 border-r border-slate-200"><input type="date" value={row.termino || ''} onChange={(e) => handleInputChange(index, 'termino', e.target.value)} className="w-full p-1.5 outline-none bg-white border border-slate-200 rounded text-xs text-slate-600 focus:ring-1 focus:ring-[#2563eb]/20" /></td>
