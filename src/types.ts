@@ -39,22 +39,37 @@ export interface PdiEntry {
   departamento?: string; 
 }
 
-// NOVO: Colaborador agora pode pertencer a múltiplos departamentos
 export interface UsuarioConfig {
+  id?: string; // Adicionado ID para facilitar edição
   nome: string;
   email: string;
   departamentos?: string[]; 
 }
 
-// NOVO: Configurações Gerais agora controlam os Departamentos
+// NOVO: Estrutura da Empresa Base
+export interface EmpresaBase {
+  id: string;
+  nome: string;
+  tributacao: string;
+}
+
+// NOVO: Estrutura das Metas
+export interface MetaGlobal {
+  id: string;
+  nome: string;
+  departamento: string; // Para filtrar: meta de Folha só aparece no Pessoal
+}
+
 export interface AppSettings {
   responsaveis: string[];
   atividades: string[];
   prioridades: string[];
   tributacoes: string[];
-  empresas: string[];
+  empresas: string[]; // Antigo (manteremos por enquanto para não quebrar)
   usuarios?: string | UsuarioConfig[]; 
   departamentos?: string[]; 
+  empresas_base?: EmpresaBase[]; // NOVO
+  metas_globais?: MetaGlobal[]; // NOVO
 }
 
 export const MONTHS = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
