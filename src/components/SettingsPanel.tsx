@@ -6,6 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import { AppSettings, UsuarioConfig, EmpresaBase, MetaGlobal, MetaVinculada } from '../types';
 import { Plus, Trash2, Save, Building2, Users, Briefcase, ListTodo, ShieldAlert, Edit2, Search, Target, X, Check, CheckSquare, ArrowUpDown, EyeOff, UserCheck } from 'lucide-react';
+import { supabase } from '../supabase'; // Importação necessária para a sincronização
 
 interface SettingsPanelProps {
   settings: AppSettings;
@@ -42,7 +43,7 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
 
   const [empresaSearch, setEmpresaSearch] = useState('');
   const [empresaFilterTrib, setEmpresaFilterTrib] = useState('');
-  const [showInactiveEmpresas, setShowInactiveEmpresas] = useState(false); // NOVO ESTADO
+  const [showInactiveEmpresas, setShowInactiveEmpresas] = useState(false); 
   const [isEmpresaModalOpen, setIsEmpresaModalOpen] = useState(false);
   
   const [sortConfig, setSortConfig] = useState<{ key: 'nome' | 'tributacao' | 'metas', direction: 'asc' | 'desc' } | null>(null);
@@ -50,7 +51,7 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
   const [empresaId, setEmpresaId] = useState('');
   const [empresaNome, setEmpresaNome] = useState('');
   const [empresaTrib, setEmpresaTrib] = useState('');
-  const [empresaInactive, setEmpresaInactive] = useState(false); // NOVO ESTADO
+  const [empresaInactive, setEmpresaInactive] = useState(false); 
   const [empresaMetas, setEmpresaMetas] = useState<MetaVinculada[]>([]);
   
   const [selectedMetaIdToLink, setSelectedMetaIdToLink] = useState('');
@@ -84,11 +85,55 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
     })));
   }, [settings]);
 
+  // === O NOVO CÉREBRO DE SINCRONIZAÇÃO ===
   const handleSave = async () => {
     setSaving(true);
     const finalSettings = { ...localSettings, usuarios: JSON.stringify(usuarios) };
+    
+    // 1. Salva as configurações globais primeiro
     await setSettings(finalSettings);
-    alert('Configurações Globais salvas com sucesso!');
+
+    // 2. Sincroniza em massa todas as empresas que já estavam nos painéis (Update Cascata)
+    try {
+      const { data: allClients } = await supabase.from('clients').select('id, empresa, departamento, tributacao, tempo_estimado');
+      
+      if (allClients) {
+        const updatePromises = []; // Para processar tudo de uma vez super rápido
+        
+        for (const client of allClients) {
+          const empBase = finalSettings.empresas_base?.find(e => e.nome === client.empresa);
+          if (empBase) {
+            // Recalcula o tempo para o departamento atual do cliente
+            const deptMetas = finalSettings.metas_globais?.filter(m => m.departamento === client.departamento) || [];
+            const deptMetaIds = deptMetas.map(m => m.id);
+            
+            let totalTime = 0;
+            (empBase.metas_vinculadas || []).forEach(mv => {
+              if (deptMetaIds.includes(mv.metaId)) totalTime += mv.tempo_estimado;
+            });
+
+            // Se houve mudança na tributação ou no tempo, manda atualizar!
+            if (client.tributacao !== empBase.tributacao || client.tempo_estimado !== totalTime) {
+              updatePromises.push(
+                supabase.from('clients').update({
+                  tributacao: empBase.tributacao || '',
+                  tempo_estimado: totalTime
+                }).eq('id', client.id)
+              );
+            }
+          }
+        }
+
+        // Executa todas as atualizações no banco de dados de uma só vez
+        if (updatePromises.length > 0) {
+          await Promise.all(updatePromises);
+        }
+      }
+    } catch (err) {
+      console.error('Erro na sincronização:', err);
+    }
+
+    alert('Configurações salvas! Todos os painéis foram sincronizados com sucesso.');
     setSaving(false);
   };
 
@@ -185,7 +230,7 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
       setEmpresaId(emp.id);
       setEmpresaNome(emp.nome);
       setEmpresaTrib(emp.tributacao || '');
-      setEmpresaInactive(emp.is_inactive || false); // Seta inativação
+      setEmpresaInactive(emp.is_inactive || false); 
       setEmpresaMetas(emp.metas_vinculadas || []);
     } else {
       setEmpresaId(generateId());
@@ -220,7 +265,7 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
       id: empresaId,
       nome: empresaNome.toUpperCase().trim(),
       tributacao: empresaTrib,
-      is_inactive: empresaInactive, // Salva o status
+      is_inactive: empresaInactive, 
       metas_vinculadas: empresaMetas
     };
 
@@ -246,7 +291,7 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
   let filteredEmpresas = (localSettings.empresas_base || []).filter(e => {
     const matchSearch = e.nome.toLowerCase().includes(empresaSearch.toLowerCase());
     const matchTrib = empresaFilterTrib ? e.tributacao === empresaFilterTrib : true;
-    const matchActive = showInactiveEmpresas ? true : !e.is_inactive; // Filtro de inativas
+    const matchActive = showInactiveEmpresas ? true : !e.is_inactive; 
     return matchSearch && matchTrib && matchActive;
   });
 
@@ -395,7 +440,7 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
           </div>
         )}
 
-        {/* OUTRAS ABAS (Mantidas como estavam) */}
+        {/* OUTRAS ABAS */}
         {activeTab === 'metas' && (
           <div className="max-w-3xl animate-fade-in">
             <div className="mb-6"><h3 className="text-xl font-bold text-[#1e3a8a]">Biblioteca de Metas (Ações)</h3></div>
@@ -426,7 +471,6 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
         {activeTab === 'colaboradores' && (
           <div className="max-w-4xl animate-fade-in">
              <div className="mb-6"><h3 className="text-xl font-bold text-[#1e3a8a]">Gestão de Colaboradores e Acessos</h3></div>
-             {/* Omitido por clareza para focar nas empresas, código dos colaboradores mantido */}
              <div className={`border rounded-2xl p-5 mb-8 shadow-inner transition-colors ${editingUserIndex !== null ? 'bg-[#f0f4ff] border-[#bfdbfe]' : 'bg-slate-50 border-slate-200'}`}>
               <div className="flex justify-between items-center mb-3">
                 <h4 className={`text-sm font-bold uppercase tracking-wider ${editingUserIndex !== null ? 'text-[#1e3a8a]' : 'text-slate-700'}`}>{editingUserIndex !== null ? 'Editando Colaborador' : 'Novo Colaborador'}</h4>
@@ -474,7 +518,7 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
         )}
       </div>
 
-      {/* MODAIS */}
+      {/* MODAIS (CRIAR EMPRESA E AÇÕES EM LOTE) */}
       {showBulkModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[110] p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-fade-in">
@@ -502,7 +546,6 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
                 <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Tributação</label><select value={empresaTrib} onChange={(e) => setEmpresaTrib(e.target.value)} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:border-[#2563eb] font-bold text-slate-700"><option value="">Selecione...</option>{safeTributacoes.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
               </div>
               
-              {/* O NOVO CHECKBOX DE INATIVAÇÃO NO MODAL DE EDIÇÃO */}
               <div className="md:col-span-2 flex items-center gap-2 bg-red-50 p-3 rounded-lg border border-red-100 mt-2">
                 <input type="checkbox" id="emp_inativa" checked={empresaInactive} onChange={(e) => setEmpresaInactive(e.target.checked)} className="w-4 h-4 text-red-600 rounded border-red-300 cursor-pointer focus:ring-red-600" />
                 <label htmlFor="emp_inativa" className="text-sm font-bold text-red-700 cursor-pointer">Inativar Empresa Base (Oculta das listas de alocação)</label>
