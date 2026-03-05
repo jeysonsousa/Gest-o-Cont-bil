@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { AppSettings, UsuarioConfig, EmpresaBase, MetaGlobal, MetaVinculada } from '../types';
-import { Plus, Trash2, Save, Building2, Users, Briefcase, ListTodo, ShieldAlert, Edit2, Search, Target, X, Check, CheckSquare } from 'lucide-react';
+import { Plus, Trash2, Save, Building2, Users, Briefcase, ListTodo, ShieldAlert, Edit2, Search, Target, X, Check, CheckSquare, ArrowUpDown } from 'lucide-react';
 
 interface SettingsPanelProps {
   settings: AppSettings;
@@ -35,7 +35,7 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserDepts, setNewUserDepts] = useState<string[]>([]);
   const [newUserIsEstagiario, setNewUserIsEstagiario] = useState(false);
-  const [newUserIsAdmin, setNewUserIsAdmin] = useState(false); // NOVO ESTADO DE ADMIN
+  const [newUserIsAdmin, setNewUserIsAdmin] = useState(false); 
 
   const [newMetaNome, setNewMetaNome] = useState('');
   const [newMetaDept, setNewMetaDept] = useState('');
@@ -43,6 +43,9 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
   const [empresaSearch, setEmpresaSearch] = useState('');
   const [empresaFilterTrib, setEmpresaFilterTrib] = useState('');
   const [isEmpresaModalOpen, setIsEmpresaModalOpen] = useState(false);
+  
+  // Estado para ordenação das empresas
+  const [sortConfig, setSortConfig] = useState<{ key: 'nome' | 'tributacao' | 'metas', direction: 'asc' | 'desc' } | null>(null);
   
   const [empresaId, setEmpresaId] = useState('');
   const [empresaNome, setEmpresaNome] = useState('');
@@ -108,7 +111,6 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
   const saveUser = () => {
     if (!newUserNome.trim() || !newUserEmail.trim()) return;
     
-    // Se for Admin, não precisa obrigatoriamente de setor, ele vê todos. Mas mantemos a lógica livre.
     const updatedUsers = [...usuarios];
     const userData: UsuarioConfig = { 
       nome: newUserNome.toUpperCase().trim(), 
@@ -249,11 +251,39 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
   const safeMetasGlobais = localSettings.metas_globais || [];
   const safeTributacoes = localSettings.tributacoes || [];
 
-  const filteredEmpresas = (localSettings.empresas_base || []).filter(e => {
+  // Filtro e Ordenação
+  let filteredEmpresas = (localSettings.empresas_base || []).filter(e => {
     const matchSearch = e.nome.toLowerCase().includes(empresaSearch.toLowerCase());
     const matchTrib = empresaFilterTrib ? e.tributacao === empresaFilterTrib : true;
     return matchSearch && matchTrib;
   });
+
+  filteredEmpresas.sort((a, b) => {
+    if (!sortConfig) return a.nome.localeCompare(b.nome); // Ordem alfabética por padrão
+
+    let aVal: any = a.nome.toLowerCase();
+    let bVal: any = b.nome.toLowerCase();
+
+    if (sortConfig.key === 'tributacao') {
+      aVal = a.tributacao || '';
+      bVal = b.tributacao || '';
+    } else if (sortConfig.key === 'metas') {
+      aVal = a.metas_vinculadas?.length || 0;
+      bVal = b.metas_vinculadas?.length || 0;
+    }
+
+    if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+    if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  const handleSortEmpresas = (key: 'nome' | 'tributacao' | 'metas') => {
+    let direction: 'asc' | 'desc' = 'asc';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
 
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.checked) setSelectedEmpresasIds(filteredEmpresas.map(emp => emp.id));
@@ -298,6 +328,7 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col md:flex-row h-[75vh]">
       
+      {/* MENU LATERAL */}
       <div className="w-full md:w-64 bg-slate-50 border-r border-slate-200 flex flex-col p-4 gap-2">
         <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2 px-2">Painel de Controle</h2>
         
@@ -324,9 +355,10 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
         </div>
       </div>
 
+      {/* ÁREA DE CONTEÚDO */}
       <div className="flex-1 overflow-auto p-6 md:p-8 bg-white relative">
         
-        {/* ABA: EMPRESAS BASE */}
+        {/* ABA: EMPRESAS BASE COM BULK EDIT */}
         {activeTab === 'empresas' && (
           <div className="max-w-5xl animate-fade-in flex flex-col h-full">
             <div className="flex justify-between items-start mb-6">
@@ -350,6 +382,7 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
               </select>
             </div>
 
+            {/* BARRA DE AÇÕES EM LOTE */}
             {selectedEmpresasIds.length > 0 && (
               <div className="bg-[#f0f4ff] border border-[#bfdbfe] p-3 rounded-xl mb-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 animate-fade-in shadow-sm">
                 <span className="text-sm font-black text-[#1e3a8a] flex items-center gap-2">
@@ -367,24 +400,40 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
             )}
 
             <div className="flex-1 bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm flex flex-col">
-              <div className="overflow-y-auto flex-1">
+              <div className="overflow-y-auto flex-1 scrollbar-thin scrollbar-thumb-slate-300">
                 <table className="w-full text-left text-sm whitespace-nowrap">
                   <thead className="bg-slate-50 text-slate-600 font-bold sticky top-0 border-b border-slate-200 z-10">
                     <tr>
-                      <th className="px-4 py-3 w-12 text-center">
-                        <input type="checkbox" onChange={handleSelectAll} checked={filteredEmpresas.length > 0 && selectedEmpresasIds.length === filteredEmpresas.length} className="w-4 h-4 text-[#2563eb] rounded border-slate-300 cursor-pointer" />
+                      <th className="px-4 py-3 w-12 text-center border-r border-slate-200">
+                        <input 
+                          type="checkbox" 
+                          onChange={handleSelectAll} 
+                          checked={filteredEmpresas.length > 0 && selectedEmpresasIds.length === filteredEmpresas.length} 
+                          className="w-4 h-4 text-[#2563eb] rounded border-slate-300 cursor-pointer"
+                        />
                       </th>
-                      <th className="px-4 py-3">Empresa</th>
-                      <th className="px-4 py-3 text-center">Tributação</th>
-                      <th className="px-4 py-3 text-center">Metas Vinculadas</th>
+                      <th className="px-4 py-3 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSortEmpresas('nome')}>
+                        <div className="flex items-center gap-1">Empresa <ArrowUpDown size={14} className="text-slate-400"/></div>
+                      </th>
+                      <th className="px-4 py-3 text-center cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSortEmpresas('tributacao')}>
+                        <div className="flex items-center justify-center gap-1">Tributação <ArrowUpDown size={14} className="text-slate-400"/></div>
+                      </th>
+                      <th className="px-4 py-3 text-center cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSortEmpresas('metas')}>
+                        <div className="flex items-center justify-center gap-1">Metas Vinculadas <ArrowUpDown size={14} className="text-slate-400"/></div>
+                      </th>
                       <th className="px-4 py-3 text-right">Ações</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {filteredEmpresas.map(emp => (
                       <tr key={emp.id} className={`hover:bg-slate-50 group transition-colors ${selectedEmpresasIds.includes(emp.id) ? 'bg-[#f0f4ff]/40' : ''}`}>
-                        <td className="px-4 py-3 text-center">
-                          <input type="checkbox" checked={selectedEmpresasIds.includes(emp.id)} onChange={() => handleSelectOne(emp.id)} className="w-4 h-4 text-[#2563eb] rounded border-slate-300 cursor-pointer" />
+                        <td className="px-4 py-3 text-center border-r border-slate-100">
+                          <input 
+                            type="checkbox" 
+                            checked={selectedEmpresasIds.includes(emp.id)} 
+                            onChange={() => handleSelectOne(emp.id)} 
+                            className="w-4 h-4 text-[#2563eb] rounded border-slate-300 cursor-pointer"
+                          />
                         </td>
                         <td className="px-4 py-3 font-bold text-slate-800">{emp.nome}</td>
                         <td className="px-4 py-3 text-center">
@@ -396,7 +445,7 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
                         <td className="px-4 py-3 text-right">
                           <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                             <button onClick={() => openEmpresaModal(emp)} className="p-1.5 text-slate-400 hover:text-[#2563eb] hover:bg-[#f0f4ff] rounded-md transition-colors" title="Editar Empresa e Metas"><Edit2 size={16} /></button>
-                            <button onClick={() => removeEmpresa(emp.id)} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors"><Trash2 size={16} /></button>
+                            <button onClick={() => removeEmpresa(emp.id)} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors" title="Excluir Empresa"><Trash2 size={16} /></button>
                           </div>
                         </td>
                       </tr>
@@ -463,7 +512,7 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
           </div>
         )}
 
-        {/* ABA: COLABORADORES COM CHECKBOX DE ADMIN E ESTAGIÁRIO */}
+        {/* ABA: COLABORADORES */}
         {activeTab === 'colaboradores' && (
           <div className="max-w-4xl animate-fade-in">
             <div className="mb-6">
@@ -492,7 +541,6 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
                       <span className="text-sm font-bold text-slate-600">É Estagiário (Calcula meia diária na produtividade)</span>
                     </label>
                     <hr className="border-slate-100" />
-                    {/* CHECKBOX DE ADMIN */}
                     <label className="flex items-center gap-2 cursor-pointer">
                       <input type="checkbox" checked={newUserIsAdmin} onChange={(e) => setNewUserIsAdmin(e.target.checked)} className="w-4 h-4 text-red-600 rounded border-red-300 focus:ring-red-600" />
                       <span className="text-sm font-black text-red-600">É Administrador (Acesso total ao sistema)</span>
@@ -525,7 +573,6 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
                   <div>
                     <h4 className="font-black text-slate-800 text-lg uppercase flex items-center gap-2">
                       {user.nome}
-                      {/* BADGE DE ESTAGIÁRIO E ADMIN */}
                       {user.isEstagiario && <span className="bg-amber-100 text-amber-700 text-[10px] px-2 py-0.5 rounded font-bold tracking-wider">ESTAGIÁRIO</span>}
                       {user.isAdmin && <span className="bg-red-100 text-red-700 text-[10px] px-2 py-0.5 rounded font-bold tracking-wider border border-red-200">ADMINISTRADOR</span>}
                     </h4>
