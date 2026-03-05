@@ -6,7 +6,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../supabase';
 import { PdiEntry, Client, AppSettings, MONTHS, Status, StatusRecord, UsuarioConfig } from '../types';
-import { Save, Plus, Trash2, Target, Check, CheckCheck, Search, ShieldAlert, PieChart, ChevronDown, ChevronUp } from 'lucide-react';
+import { Save, Plus, Trash2, Target, Check, CheckCheck, Search, ShieldAlert, ChevronDown, ChevronUp, CalendarClock, AlertCircle } from 'lucide-react';
 
 const currentYearNum = new Date().getFullYear();
 const YEARS = Array.from({ length: 5 }, (_, i) => (currentYearNum - 1 + i).toString());
@@ -29,11 +29,12 @@ const formatDateForSearch = (dateStr?: string) => {
   return dateStr;
 };
 
+const ADMIN_EMAILS = ['jeyson@vsmweb.com.br', 'cristiane.cardoso@vsmweb.com.br'];
+
 export function Pdi({ currentDepartment }: { currentDepartment: string }) {
   const [isAdmin, setIsAdmin] = useState(false);
   const [userEmail, setUserEmail] = useState('');
   const [authLoaded, setAuthLoaded] = useState(false);
-  const [debugUsuarios, setDebugUsuarios] = useState<UsuarioConfig[]>([]);
 
   const [activeMonth, setActiveMonth] = useState<string>(MONTHS[defaultMonthIndex]);
   const [activeYear, setActiveYear] = useState<string>(defaultYearNum.toString());
@@ -74,14 +75,10 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
           try { rawUsuarios = JSON.parse(rawUsuarios); } catch(e) { rawUsuarios = []; }
         }
         const usuariosConfig: UsuarioConfig[] = rawUsuarios;
-        setDebugUsuarios(usuariosConfig); 
         
-        // Definição de Admin Master + Dinâmico
-        let userIsAdmin = userEmail === 'jeyson@vsmweb.com.br';
+        let userIsAdmin = ADMIN_EMAILS.includes(userEmail);
         const myConfig = usuariosConfig.find(u => u.email === userEmail);
-        if (myConfig && myConfig.isAdmin) {
-           userIsAdmin = true;
-        }
+        if (myConfig && myConfig.isAdmin) userIsAdmin = true;
         setIsAdmin(userIsAdmin);
 
         const list = (clientsData || []).filter(c => !c.is_inactive).map(c => c.responsavel);
@@ -89,13 +86,9 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
         
         if (userIsAdmin) {
           const configuredNames = usuariosConfig.map(u => u.nome.toUpperCase());
-          allowedAnalysts = [...new Set([...list.map(n => n.toUpperCase()), ...configuredNames])].sort();
+          allowedAnalysts = [...new Set([...list.map(n => n?.toUpperCase() || ''), ...configuredNames])].sort();
         } else {
-          if (myConfig) {
-            allowedAnalysts = [myConfig.nome.toUpperCase()];
-          } else {
-            allowedAnalysts = [];
-          }
+          if (myConfig) allowedAnalysts = [myConfig.nome.toUpperCase()];
         }
         
         setActiveAnalysts(allowedAnalysts);
@@ -132,16 +125,17 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
         const dbEntries = pdiData || [];
         
         const activeClients = clients.filter((c: Client) => !c.sem_movimento && !c.is_inactive);
-        const activeClientNames = activeClients.map((c: Client) => c.empresa);
+        const activeClientNames = activeClients.map((c: Client) => c.empresa.toUpperCase().trim());
 
-        const validDbEntries = dbEntries.filter(e => e.is_extra || activeClientNames.includes(e.empresa));
+        const validDbEntries = dbEntries.filter(e => e.is_extra || activeClientNames.includes(e.empresa.toUpperCase().trim()));
         const combined: PdiEntry[] = [...validDbEntries];
         setBaseClients(activeClients); 
 
-        const deptMetasGlobais = (settings.metas_globais || []).filter(m => m.departamento === currentDepartment);
+        // O CÉREBRO AGORA É BLINDADO CONTRA ERROS DE ESPAÇAMENTO E CAIXA ALTA/BAIXA
+        const deptMetasGlobais = (settings.metas_globais || []).filter(m => m.departamento.toUpperCase().trim() === currentDepartment.toUpperCase().trim());
 
         activeClients.forEach((client: Client) => {
-          const empBase = (settings.empresas_base || []).find(e => e.nome === client.empresa);
+          const empBase = (settings.empresas_base || []).find(e => e.nome.toUpperCase().trim() === client.empresa.toUpperCase().trim());
           
           if (empBase && empBase.metas_vinculadas) {
             const linkedDeptMetas = empBase.metas_vinculadas.filter(mv => deptMetasGlobais.some(dmg => dmg.id === mv.metaId));
@@ -149,7 +143,11 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
             linkedDeptMetas.forEach(mv => {
               const metaDef = deptMetasGlobais.find(dmg => dmg.id === mv.metaId);
               if (metaDef) {
-                const exists = validDbEntries.find(e => e.empresa === client.empresa && e.atividade === metaDef.nome && !e.is_extra);
+                const exists = validDbEntries.find(e => 
+                  e.empresa.toUpperCase().trim() === client.empresa.toUpperCase().trim() && 
+                  e.atividade.toUpperCase().trim() === metaDef.nome.toUpperCase().trim() && 
+                  !e.is_extra
+                );
                 
                 if (!exists) {
                   combined.push({
@@ -185,6 +183,24 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
     const completed = localData.filter(d => d.status === 'analyst' || d.status === 'ok').length;
     const avg = Math.round((completed / total) * 100);
     return { avg, total, completed };
+  }, [localData]);
+
+  // CÁLCULO DAS TAREFAS DO DIA
+  const { tarefasHoje, tarefasAtrasadas } = useMemo(() => {
+    const todayDate = new Date();
+    const offset = todayDate.getTimezoneOffset();
+    const todayStr = new Date(todayDate.getTime() - (offset*60*1000)).toISOString().split('T')[0];
+
+    let hoje = 0;
+    let atrasadas = 0;
+
+    localData.forEach(row => {
+      if (row.status === 'n' && row.termino) {
+        if (row.termino === todayStr) hoje++;
+        else if (row.termino < todayStr) atrasadas++;
+      }
+    });
+    return { tarefasHoje: hoje, tarefasAtrasadas: atrasadas };
   }, [localData]);
 
   const groupedTasks = useMemo(() => {
@@ -303,10 +319,6 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
     return { color: 'bg-emerald-500', title: 'Concluído' };
   };
 
-  const radius = 50;
-  const circumference = 2 * Math.PI * radius;
-  const strokeDashoffset = circumference - (metrics.avg / 100) * circumference;
-
   if (!authLoaded) return <div className="p-8 text-center font-bold text-slate-500">Autenticando painel...</div>;
 
   const renderRow = (row: PdiEntry, index: number) => {
@@ -314,13 +326,13 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
     return (
       <tr key={index} className={row.is_extra ? 'bg-slate-50/50' : 'hover:bg-slate-50'}>
         <td className="p-1 border-r border-slate-200"><input type="text" value={row.empresa} onChange={(e) => handleInputChange(index, 'empresa', e.target.value)} disabled={!row.is_extra} className={`w-full p-2 outline-none uppercase font-bold text-xs ${!row.is_extra ? 'bg-transparent text-slate-700' : 'bg-white border border-slate-300 rounded'}`} placeholder="NOME DA EMPRESA" /></td>
-        <td className="p-1 border-r border-slate-200"><input type="text" value={row.atividade} onChange={(e) => handleInputChange(index, 'atividade', e.target.value)} disabled={!row.is_extra} className={`w-full p-2 outline-none bg-transparent text-[#1e3a8a] font-bold text-xs ${!row.is_extra && 'cursor-not-allowed'}`} placeholder="Qual a ação?" title={!row.is_extra ? 'Ação vinda do Cadastro Global' : ''} /></td>
-        <td className="p-1 border-r border-slate-200 text-center"><input type="text" value={row.competencia} onChange={(e) => handleInputChange(index, 'competencia', e.target.value)} className="w-full p-2 outline-none bg-transparent text-slate-500 text-xs text-center" /></td>
-        <td className="p-1 border-r border-slate-200"><input type="date" value={row.inicio || ''} onChange={(e) => handleInputChange(index, 'inicio', e.target.value)} className="w-full p-1.5 outline-none bg-white border border-slate-200 rounded text-xs text-slate-600 focus:ring-1 focus:ring-[#2563eb]/20" /></td>
-        <td className="p-1 border-r border-slate-200"><input type="date" value={row.termino || ''} onChange={(e) => handleInputChange(index, 'termino', e.target.value)} className="w-full p-1.5 outline-none bg-white border border-slate-200 rounded text-xs text-slate-600 focus:ring-1 focus:ring-[#2563eb]/20" /></td>
+        <td className="p-1 border-r border-slate-200"><input type="text" value={row.atividade} onChange={(e) => handleInputChange(index, 'atividade', e.target.value)} disabled={!row.is_extra} className={`w-full p-2 outline-none bg-transparent text-[#1e3a8a] font-bold text-[11px] ${!row.is_extra && 'cursor-not-allowed'}`} placeholder="Qual a ação?" title={!row.is_extra ? 'Ação vinda do Cadastro Global' : ''} /></td>
+        <td className="p-1 border-r border-slate-200 text-center"><input type="text" value={row.competencia} onChange={(e) => handleInputChange(index, 'competencia', e.target.value)} className="w-full p-2 outline-none bg-transparent text-slate-500 text-[11px] font-bold text-center" /></td>
+        <td className="p-1 border-r border-slate-200"><input type="date" value={row.inicio || ''} onChange={(e) => handleInputChange(index, 'inicio', e.target.value)} className="w-full p-1.5 outline-none bg-white border border-slate-200 rounded text-xs font-medium text-slate-600 focus:border-[#2563eb]" /></td>
+        <td className="p-1 border-r border-slate-200"><input type="date" value={row.termino || ''} onChange={(e) => handleInputChange(index, 'termino', e.target.value)} className="w-full p-1.5 outline-none bg-white border border-slate-200 rounded text-xs font-medium text-slate-600 focus:border-[#2563eb]" /></td>
         <td className="p-1 border-r border-slate-200 bg-slate-50/50">
           <div className="flex flex-col gap-1 items-center">
-            <input type="date" value={row.prazo_realizado || ''} onChange={(e) => handleInputChange(index, 'prazo_realizado', e.target.value)} className="w-full p-1.5 outline-none bg-white border border-slate-200 rounded text-xs text-slate-600 focus:ring-1 focus:ring-[#2563eb]/20" />
+            <input type="date" value={row.prazo_realizado || ''} onChange={(e) => handleInputChange(index, 'prazo_realizado', e.target.value)} className="w-full p-1.5 outline-none bg-white border border-slate-200 rounded text-xs font-bold text-[#1e3a8a] focus:border-[#2563eb]" />
             <label className="flex items-center gap-1 cursor-pointer hover:bg-slate-200 px-1.5 rounded transition-colors" title="Marque se utilizou apenas meio expediente">
               <input type="checkbox" checked={row.meio_expediente || false} onChange={(e) => handleInputChange(index, 'meio_expediente', e.target.checked)} className="w-3 h-3 text-[#2563eb] rounded border-slate-300 focus:ring-[#2563eb]" />
               <span className="text-[9px] font-bold text-slate-500 uppercase">-0,5 DIA</span>
@@ -341,8 +353,10 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
   };
 
   return (
-    <div className="p-6 max-w-[1600px] mx-auto space-y-6">
-      <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+    <div className="p-4 md:p-6 max-w-[1600px] mx-auto space-y-4 md:space-y-6">
+      
+      {/* CABEÇALHO */}
+      <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
             <Target className="text-[#1e3a8a]" /> PDI da Equipe: <span className="text-[#2563eb]">{currentDepartment}</span>
@@ -355,7 +369,7 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
             value={activeResponsavel} 
             onChange={(e) => setActiveResponsavel(e.target.value)}
             disabled={!isAdmin} 
-            className={`border border-slate-200 px-3 py-2 rounded-lg text-sm font-medium focus:outline-none min-w-[150px] ${!isAdmin ? 'bg-slate-100 cursor-not-allowed text-slate-500' : 'bg-white focus:border-[#2563eb]'}`}
+            className={`border border-slate-200 px-3 py-2 rounded-lg text-sm font-bold focus:outline-none min-w-[150px] ${!isAdmin ? 'bg-slate-100 cursor-not-allowed text-slate-500' : 'bg-white text-slate-800 focus:border-[#2563eb]'}`}
           >
             {activeAnalysts.map(r => <option key={r} value={r}>{r}</option>)}
           </select>
@@ -378,48 +392,55 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex">
-              <div className="bg-gradient-to-br from-[#1e3a8a] to-[#0f172a] text-white p-6 w-48 flex flex-col items-center justify-center text-center shadow-inner">
-                <PieChart size={32} className="mb-2 opacity-80" />
-                <span className="font-bold text-sm uppercase tracking-wider">Evolução<br/>Mensal</span>
-              </div>
-              <div className="flex-1 p-6 flex items-center justify-center gap-8">
-                <div className="relative w-32 h-32">
-                  <svg className="w-full h-full transform -rotate-90">
-                    <circle cx="64" cy="64" r={radius} stroke="currentColor" strokeWidth="20" fill="transparent" className="text-slate-100" />
-                    <circle cx="64" cy="64" r={radius} stroke="currentColor" strokeWidth="20" fill="transparent" strokeDasharray={circumference} strokeDashoffset={strokeDashoffset} className="text-emerald-500 transition-all duration-1000 ease-out" />
+          {/* NOVO LAYOUT DOS CARDS SUPERIORES: REDUZIDOS E INTELIGENTES */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            
+            {/* 1. Desempenho (Evolução) */}
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col justify-between">
+              <div className="flex justify-between items-start mb-2">
+                 <div>
+                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Evolução Mensal</p>
+                   <h3 className="text-3xl font-black text-[#1e3a8a]">{metrics.avg}%</h3>
+                 </div>
+                 <div className="relative w-12 h-12">
+                  <svg className="w-full h-full transform -rotate-90 relative z-10">
+                    <circle cx="24" cy="24" r="20" stroke="currentColor" strokeWidth="6" fill="transparent" className="text-slate-100" />
+                    <circle cx="24" cy="24" r="20" stroke="currentColor" strokeWidth="6" fill="transparent" strokeDasharray={125.6} strokeDashoffset={125.6 - (metrics.avg / 100) * 125.6} className="text-emerald-500 transition-all duration-1000 ease-out" />
                   </svg>
-                  <div className="absolute inset-0 flex items-center justify-center flex-col">
-                    <span className="text-2xl font-bold text-slate-800">{metrics.avg}%</span>
-                  </div>
-                </div>
-                <div className="flex flex-col gap-2">
-                  <div className="flex items-center gap-2"><div className="w-3 h-3 bg-emerald-500 rounded-full"></div><span className="text-sm text-slate-600 font-medium">Realizado</span></div>
-                  <div className="flex items-center gap-2"><div className="w-3 h-3 bg-slate-100 rounded-full"></div><span className="text-sm text-slate-600 font-medium">Pendente</span></div>
-                </div>
+                 </div>
               </div>
             </div>
 
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
-              <div className="bg-slate-100 text-[#0f172a] font-black p-3 text-center text-sm border-b border-slate-200">
-                ANÁLISE DE DESEMPENHO
+            {/* 2. Resumo de Entregas */}
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col justify-between">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Volume de Entregas</p>
+              <div className="flex items-baseline gap-2 mb-1">
+                <h3 className="text-3xl font-black text-slate-800">{metrics.completed}</h3>
+                <span className="text-sm font-bold text-slate-400 mb-1">/ {metrics.total}</span>
               </div>
-              <div className="p-6 flex-1 flex flex-col justify-center gap-4">
-                <div className="flex justify-between items-center bg-slate-50 p-2 rounded border border-slate-100">
-                  <span className="text-sm font-bold text-slate-600">Desempenho:</span>
-                  <span className="font-bold text-slate-800">{(metrics.avg / 100).toFixed(2).replace('.', ',')}</span>
-                </div>
-                <div className="flex justify-between items-center bg-slate-50 p-2 rounded border border-slate-100">
-                  <span className="text-sm font-bold text-slate-600">% Concluído:</span>
-                  <span className="font-bold text-emerald-600">{metrics.avg}%</span>
-                </div>
-                <div className="flex justify-between items-center bg-slate-50 p-2 rounded border border-slate-100">
-                  <span className="text-sm font-bold text-slate-600">Atividades Prontas:</span>
-                  <span className="font-bold text-slate-800">{metrics.completed} / {metrics.total}</span>
-                </div>
-              </div>
+              <p className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded inline-block w-fit">Metas Validadas</p>
             </div>
+
+            {/* 3. Tarefas Hoje */}
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col justify-between relative overflow-hidden group">
+              <div className="absolute right-0 top-0 bottom-0 w-1 bg-amber-400 transition-all"></div>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-1">
+                <CalendarClock size={12}/> Vencem Hoje
+              </p>
+              <h3 className="text-3xl font-black text-amber-500 mb-1">{tarefasHoje}</h3>
+              <p className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded inline-block w-fit">Atenção ao Prazo</p>
+            </div>
+
+            {/* 4. Atrasadas */}
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col justify-between relative overflow-hidden group">
+              <div className="absolute right-0 top-0 bottom-0 w-1 bg-red-500 transition-all"></div>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-1">
+                <AlertCircle size={12}/> Atrasadas
+              </p>
+              <h3 className="text-3xl font-black text-red-500 mb-1">{tarefasAtrasadas}</h3>
+              <p className="text-[10px] font-bold text-red-700 bg-red-50 px-2 py-0.5 rounded inline-block w-fit">Requer Ação</p>
+            </div>
+            
           </div>
 
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
@@ -429,13 +450,13 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
               <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
                 <div className="relative flex-1 min-w-[280px]">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                  <input type="text" placeholder="Buscar empresa, ação ou data..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20 transition-all"/>
+                  <input type="text" placeholder="Buscar empresa, ação ou data..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20 transition-all"/>
                 </div>
 
-                <button onClick={handleAddExtra} className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-600 bg-slate-50 border border-slate-200 hover:bg-slate-100 rounded-lg transition-colors">
+                <button onClick={handleAddExtra} className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-100 rounded-lg transition-colors shadow-sm">
                   <Plus size={16} /> Adicionar Extra
                 </button>
-                <button onClick={handleSave} disabled={saving} className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors disabled:opacity-50 shadow-sm">
+                <button onClick={handleSave} disabled={saving} className="flex items-center gap-2 px-6 py-2 text-sm font-bold text-white bg-[#2563eb] hover:bg-[#1e3a8a] rounded-lg transition-colors disabled:opacity-50 shadow-sm">
                   <Save size={16} /> {saving ? 'Salvando...' : 'Salvar PDI'}
                 </button>
               </div>
@@ -443,7 +464,7 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
 
             <div className="overflow-x-auto">
               {loading ? (
-                <div className="p-8 text-center text-slate-500">Carregando dados do setor {currentDepartment}...</div>
+                <div className="p-8 text-center text-slate-500 font-bold">Processando metas do setor {currentDepartment}...</div>
               ) : (
                 <table className="w-full text-sm text-left whitespace-nowrap">
                   <thead className="bg-slate-200 text-slate-700 font-bold text-[10px] uppercase tracking-wider">
@@ -477,7 +498,7 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
                     <tbody className="divide-y divide-slate-200">
                       {groupedTasks.filteredPending.map(({row, index}) => renderRow(row, index))}
                       {groupedTasks.filteredPending.length === 0 && (
-                        <tr><td colSpan={9} className="p-4 text-center text-slate-400 text-xs font-medium">Nenhuma meta pendente encontrada.</td></tr>
+                        <tr><td colSpan={9} className="p-6 text-center text-slate-400 text-xs font-bold">Nenhuma meta pendente encontrada.</td></tr>
                       )}
                     </tbody>
                   )}
@@ -501,7 +522,7 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
                     <tbody className="divide-y divide-slate-200">
                       {groupedTasks.filteredCompleted.map(({row, index}) => renderRow(row, index))}
                       {groupedTasks.filteredCompleted.length === 0 && (
-                        <tr><td colSpan={9} className="p-4 text-center text-slate-400 text-xs font-medium">Nenhuma meta concluída encontrada.</td></tr>
+                        <tr><td colSpan={9} className="p-6 text-center text-slate-400 text-xs font-bold">Nenhuma meta concluída encontrada.</td></tr>
                       )}
                     </tbody>
                   )}
