@@ -34,7 +34,8 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
   const [newUserNome, setNewUserNome] = useState('');
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserDepts, setNewUserDepts] = useState<string[]>([]);
-  const [newUserIsEstagiario, setNewUserIsEstagiario] = useState(false); // NOVO ESTADO
+  const [newUserIsEstagiario, setNewUserIsEstagiario] = useState(false);
+  const [newUserIsAdmin, setNewUserIsAdmin] = useState(false); // NOVO ESTADO DE ADMIN
 
   const [newMetaNome, setNewMetaNome] = useState('');
   const [newMetaDept, setNewMetaDept] = useState('');
@@ -71,7 +72,12 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
     } else if (Array.isArray(settings.usuarios)) {
       parsedUsers = settings.usuarios;
     }
-    setUsuarios(parsedUsers.map(u => ({ ...u, departamentos: u.departamentos || [], isEstagiario: u.isEstagiario || false })));
+    setUsuarios(parsedUsers.map(u => ({ 
+      ...u, 
+      departamentos: u.departamentos || [], 
+      isEstagiario: u.isEstagiario || false,
+      isAdmin: u.isAdmin || false 
+    })));
   }, [settings]);
 
   const handleSave = async () => {
@@ -100,14 +106,16 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
 
   // === LÓGICA: COLABORADORES ===
   const saveUser = () => {
-    if (!newUserNome.trim() || !newUserEmail.trim() || newUserDepts.length === 0) return;
+    if (!newUserNome.trim() || !newUserEmail.trim()) return;
     
+    // Se for Admin, não precisa obrigatoriamente de setor, ele vê todos. Mas mantemos a lógica livre.
     const updatedUsers = [...usuarios];
-    const userData = { 
+    const userData: UsuarioConfig = { 
       nome: newUserNome.toUpperCase().trim(), 
       email: newUserEmail.toLowerCase().trim(), 
       departamentos: newUserDepts,
-      isEstagiario: newUserIsEstagiario // Salva se é estagiário
+      isEstagiario: newUserIsEstagiario,
+      isAdmin: newUserIsAdmin
     };
     
     if (editingUserIndex !== null) {
@@ -118,7 +126,7 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
     }
     
     setUsuarios(updatedUsers);
-    setNewUserNome(''); setNewUserEmail(''); setNewUserDepts([]); setNewUserIsEstagiario(false);
+    setNewUserNome(''); setNewUserEmail(''); setNewUserDepts([]); setNewUserIsEstagiario(false); setNewUserIsAdmin(false);
   };
 
   const editUser = (index: number) => {
@@ -127,6 +135,7 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
     setNewUserEmail(user.email);
     setNewUserDepts(user.departamentos || []);
     setNewUserIsEstagiario(user.isEstagiario || false);
+    setNewUserIsAdmin(user.isAdmin || false);
     setEditingUserIndex(index);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -289,7 +298,6 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col md:flex-row h-[75vh]">
       
-      {/* MENU LATERAL */}
       <div className="w-full md:w-64 bg-slate-50 border-r border-slate-200 flex flex-col p-4 gap-2">
         <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2 px-2">Painel de Controle</h2>
         
@@ -316,7 +324,6 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
         </div>
       </div>
 
-      {/* ÁREA DE CONTEÚDO */}
       <div className="flex-1 overflow-auto p-6 md:p-8 bg-white relative">
         
         {/* ABA: EMPRESAS BASE */}
@@ -456,7 +463,7 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
           </div>
         )}
 
-        {/* ABA: COLABORADORES COM CHECKBOX DE ESTAGIÁRIO */}
+        {/* ABA: COLABORADORES COM CHECKBOX DE ADMIN E ESTAGIÁRIO */}
         {activeTab === 'colaboradores' && (
           <div className="max-w-4xl animate-fade-in">
             <div className="mb-6">
@@ -470,7 +477,7 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
                   {editingUserIndex !== null ? 'Editando Colaborador' : 'Novo Colaborador'}
                 </h4>
                 {editingUserIndex !== null && (
-                  <button onClick={() => {setEditingUserIndex(null); setNewUserNome(''); setNewUserEmail(''); setNewUserDepts([]); setNewUserIsEstagiario(false);}} className="text-slate-400 hover:text-slate-700 text-xs font-bold underline">Cancelar Edição</button>
+                  <button onClick={() => {setEditingUserIndex(null); setNewUserNome(''); setNewUserEmail(''); setNewUserDepts([]); setNewUserIsEstagiario(false); setNewUserIsAdmin(false);}} className="text-slate-400 hover:text-slate-700 text-xs font-bold underline">Cancelar Edição</button>
                 )}
               </div>
               
@@ -478,29 +485,34 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
                 <div className="flex-1 w-full space-y-3">
                   <input type="text" value={newUserNome} onChange={(e) => setNewUserNome(e.target.value)} placeholder="Nome (Ex: CAMILA)" className="w-full px-4 py-2 bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-[#2563eb] uppercase font-bold text-sm" />
                   <input type="email" value={newUserEmail} onChange={(e) => setNewUserEmail(e.target.value)} placeholder="E-mail de acesso (@vsmweb.com.br)" className="w-full px-4 py-2 bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-[#2563eb] text-sm" />
-                  {/* NOVO: CHECKBOX DE ESTAGIÁRIO */}
-                  <label className="flex items-center gap-2 cursor-pointer mt-2 pl-1">
-                    <input type="checkbox" checked={newUserIsEstagiario} onChange={(e) => setNewUserIsEstagiario(e.target.checked)} className="w-4 h-4 text-[#2563eb] rounded border-slate-300 focus:ring-[#2563eb]" />
-                    <span className="text-sm font-bold text-slate-600">É Estagiário (Calcula meia diária na produtividade)</span>
-                  </label>
+                  
+                  <div className="flex flex-col gap-2 mt-3 p-3 bg-white border border-slate-200 rounded-lg">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" checked={newUserIsEstagiario} onChange={(e) => setNewUserIsEstagiario(e.target.checked)} className="w-4 h-4 text-[#2563eb] rounded border-slate-300 focus:ring-[#2563eb]" />
+                      <span className="text-sm font-bold text-slate-600">É Estagiário (Calcula meia diária na produtividade)</span>
+                    </label>
+                    <hr className="border-slate-100" />
+                    {/* CHECKBOX DE ADMIN */}
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" checked={newUserIsAdmin} onChange={(e) => setNewUserIsAdmin(e.target.checked)} className="w-4 h-4 text-red-600 rounded border-red-300 focus:ring-red-600" />
+                      <span className="text-sm font-black text-red-600">É Administrador (Acesso total ao sistema)</span>
+                    </label>
+                  </div>
                 </div>
                 
-                <div className="w-full md:w-auto bg-white border border-slate-200 p-3 rounded-lg flex-1">
-                  <span className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Vincular aos Setores:</span>
+                <div className={`w-full md:w-auto bg-white border border-slate-200 p-3 rounded-lg flex-1 transition-opacity ${newUserIsAdmin ? 'opacity-50 pointer-events-none' : ''}`}>
+                  <span className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Vincular aos Setores: {newUserIsAdmin && "(Admin vê todos)"}</span>
                   <div className="flex flex-wrap gap-2">
                     {safeDepartamentos.map(dept => (
                       <label key={dept} className={`flex items-center gap-1.5 px-3 py-1.5 border rounded-lg cursor-pointer transition-colors text-xs font-bold select-none ${newUserDepts.includes(dept) ? 'bg-[#dbeafe] border-[#bfdbfe] text-[#1e3a8a]' : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'}`}>
-                        <input type="checkbox" className="hidden" checked={newUserDepts.includes(dept)} onChange={() => {
-                          if (newUserDepts.includes(dept)) setNewUserDepts(newUserDepts.filter(d => d !== dept));
-                          else setNewUserDepts([...newUserDepts, dept]);
-                        }} />
+                        <input type="checkbox" className="hidden" checked={newUserDepts.includes(dept)} onChange={() => toggleNewUserDept(dept)} />
                         {dept}
                       </label>
                     ))}
                   </div>
                 </div>
 
-                <button onClick={saveUser} disabled={!newUserNome || !newUserEmail || newUserDepts.length === 0} className={`w-full md:w-auto h-full min-h-[85px] text-white px-6 py-2 rounded-xl font-bold transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${editingUserIndex !== null ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-[#2563eb] hover:bg-[#1e3a8a]'}`}>
+                <button onClick={saveUser} disabled={!newUserNome || !newUserEmail || (!newUserIsAdmin && newUserDepts.length === 0)} className={`w-full md:w-auto h-full min-h-[85px] text-white px-6 py-2 rounded-xl font-bold transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${editingUserIndex !== null ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-[#2563eb] hover:bg-[#1e3a8a]'}`}>
                   {editingUserIndex !== null ? <Check size={20} /> : <Plus size={20} />} 
                   {editingUserIndex !== null ? 'Atualizar' : 'Adicionar'}
                 </button>
@@ -513,16 +525,21 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
                   <div>
                     <h4 className="font-black text-slate-800 text-lg uppercase flex items-center gap-2">
                       {user.nome}
-                      {/* BADGE DE ESTAGIÁRIO */}
+                      {/* BADGE DE ESTAGIÁRIO E ADMIN */}
                       {user.isEstagiario && <span className="bg-amber-100 text-amber-700 text-[10px] px-2 py-0.5 rounded font-bold tracking-wider">ESTAGIÁRIO</span>}
+                      {user.isAdmin && <span className="bg-red-100 text-red-700 text-[10px] px-2 py-0.5 rounded font-bold tracking-wider border border-red-200">ADMINISTRADOR</span>}
                     </h4>
                     <span className="text-sm text-slate-500 font-medium">{user.email}</span>
                   </div>
                   <div className="flex-1 flex flex-wrap justify-end gap-2">
-                    {safeDepartamentos.map(dept => {
-                      const isLinked = user.departamentos?.includes(dept);
-                      return isLinked ? <span key={dept} className="bg-[#f0f4ff] border border-[#bfdbfe] text-[#2563eb] px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider">{dept}</span> : null;
-                    })}
+                    {user.isAdmin ? (
+                       <span className="text-xs font-bold text-red-500 uppercase">Acesso Global</span>
+                    ) : (
+                      safeDepartamentos.map(dept => {
+                        const isLinked = user.departamentos?.includes(dept);
+                        return isLinked ? <span key={dept} className="bg-[#f0f4ff] border border-[#bfdbfe] text-[#2563eb] px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider">{dept}</span> : null;
+                      })
+                    )}
                   </div>
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button onClick={() => editUser(index)} className="text-slate-400 hover:text-[#2563eb] p-2 rounded-lg hover:bg-[#f0f4ff] transition-colors"><Edit2 size={16} /></button>
