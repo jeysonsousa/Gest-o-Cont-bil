@@ -16,7 +16,7 @@ export interface Client {
   sem_movimento?: boolean;
   is_inactive?: boolean;
   tempo_estimado?: number;
-  departamento?: string; // <-- NOVO CAMPO
+  departamento?: string; 
   status: Record<string, Status | StatusRecord>;
 }
 
@@ -36,14 +36,17 @@ export interface PdiEntry {
   mes: string;
   ano: string;
   is_extra?: boolean;
-  departamento?: string; // <-- NOVO CAMPO
+  departamento?: string; 
 }
 
+// NOVO: Colaborador agora pode pertencer a múltiplos departamentos
 export interface UsuarioConfig {
   nome: string;
   email: string;
+  departamentos?: string[]; 
 }
 
+// NOVO: Configurações Gerais agora controlam os Departamentos
 export interface AppSettings {
   responsaveis: string[];
   atividades: string[];
@@ -51,6 +54,7 @@ export interface AppSettings {
   tributacoes: string[];
   empresas: string[];
   usuarios?: string | UsuarioConfig[]; 
+  departamentos?: string[]; 
 }
 
 export const MONTHS = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
