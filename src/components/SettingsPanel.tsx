@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { AppSettings, UsuarioConfig, EmpresaBase, MetaGlobal, MetaVinculada } from '../types';
-import { Plus, Trash2, Save, Building2, Users, Briefcase, ListTodo, ShieldAlert, Edit2, Search, Target, X, Check } from 'lucide-react';
+import { Plus, Trash2, Save, Building2, Users, Briefcase, ListTodo, ShieldAlert, Edit2, Search, Target, X, Check, CheckSquare } from 'lucide-react';
 
 interface SettingsPanelProps {
   settings: AppSettings;
@@ -14,42 +14,49 @@ interface SettingsPanelProps {
 
 const generateId = () => window.crypto?.randomUUID ? window.crypto.randomUUID() : Math.random().toString(36).substr(2, 9);
 
+// Função para formatar as Metas (Primeira letra maiúscula)
+const capitalizeFirstLetter = (str: string) => {
+  if (!str) return '';
+  return str.charAt(0).toUpperCase() + str.slice(1);
+};
+
 export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
   const [activeTab, setActiveTab] = useState<'empresas' | 'metas' | 'departamentos' | 'colaboradores' | 'parametros'>('empresas');
   const [localSettings, setLocalSettings] = useState<AppSettings>(settings);
   const [saving, setSaving] = useState(false);
 
-  // === ESTADOS: DEPARTAMENTOS E PARÂMETROS ===
   const [newDepartamento, setNewDepartamento] = useState('');
   const [newAtividade, setNewAtividade] = useState('');
   const [newPrioridade, setNewPrioridade] = useState('');
   const [newTributacao, setNewTributacao] = useState('');
 
-  // === ESTADOS: COLABORADORES ===
   const [usuarios, setUsuarios] = useState<UsuarioConfig[]>([]);
   const [editingUserIndex, setEditingUserIndex] = useState<number | null>(null);
   const [newUserNome, setNewUserNome] = useState('');
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserDepts, setNewUserDepts] = useState<string[]>([]);
 
-  // === ESTADOS: METAS GLOBAIS ===
   const [newMetaNome, setNewMetaNome] = useState('');
   const [newMetaDept, setNewMetaDept] = useState('');
 
-  // === ESTADOS: EMPRESAS BASE ===
   const [empresaSearch, setEmpresaSearch] = useState('');
   const [empresaFilterTrib, setEmpresaFilterTrib] = useState('');
   const [isEmpresaModalOpen, setIsEmpresaModalOpen] = useState(false);
   
-  // Formulário da Empresa Modal
   const [empresaId, setEmpresaId] = useState('');
   const [empresaNome, setEmpresaNome] = useState('');
   const [empresaTrib, setEmpresaTrib] = useState('');
   const [empresaMetas, setEmpresaMetas] = useState<MetaVinculada[]>([]);
   
-  // Vínculo de Meta na Empresa Modal
   const [selectedMetaIdToLink, setSelectedMetaIdToLink] = useState('');
   const [selectedMetaTimeToLink, setSelectedMetaTimeToLink] = useState<number | ''>('');
+
+  // === ESTADOS PARA EDIÇÃO EM LOTE (BULK) ===
+  const [selectedEmpresasIds, setSelectedEmpresasIds] = useState<string[]>([]);
+  const [showBulkModal, setShowBulkModal] = useState<'tributacao' | 'meta' | null>(null);
+  const [bulkTrib, setBulkTrib] = useState('');
+  const [bulkMetaId, setBulkMetaId] = useState('');
+  const [bulkMetaTime, setBulkMetaTime] = useState<number | ''>('');
 
   useEffect(() => {
     setLocalSettings({
@@ -133,7 +140,8 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
     const metas = localSettings.metas_globais || [];
     setLocalSettings({
       ...localSettings,
-      metas_globais: [...metas, { id: generateId(), nome: newMetaNome.toUpperCase().trim(), departamento: newMetaDept }]
+      // Aplica a regra da primeira letra maiúscula e o resto como o usuário digitou
+      metas_globais: [...metas, { id: generateId(), nome: capitalizeFirstLetter(newMetaNome.trim()), departamento: newMetaDept }]
     });
     setNewMetaNome('');
   };
@@ -141,14 +149,13 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
   const removeMetaGlobal = (id: string) => {
     if(!window.confirm('Atenção! Ao excluir esta meta, ela sumirá das empresas vinculadas. Continuar?')) return;
     const metas = (localSettings.metas_globais || []).filter(m => m.id !== id);
-    // Limpar essa meta das empresas base
     const empresas = (localSettings.empresas_base || []).map(emp => ({
       ...emp, metas_vinculadas: emp.metas_vinculadas?.filter(mv => mv.metaId !== id)
     }));
     setLocalSettings({ ...localSettings, metas_globais: metas, empresas_base: empresas });
   };
 
-  // === LÓGICA: EMPRESAS BASE E MODAL ===
+  // === LÓGICA: EMPRESAS BASE E MODAL ÚNICA ===
   const openEmpresaModal = (emp?: EmpresaBase) => {
     if (emp) {
       setEmpresaId(emp.id);
@@ -204,19 +211,70 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
     if (window.confirm('Excluir esta Empresa Base?')) {
       const currentEmpresas = (localSettings.empresas_base || []).filter(e => e.id !== id);
       setLocalSettings({ ...localSettings, empresas_base: currentEmpresas });
+      // Limpa a seleção se a empresa excluída estivesse selecionada
+      setSelectedEmpresasIds(selectedEmpresasIds.filter(selectedId => selectedId !== id));
     }
   };
 
+  // === LÓGICA: EDIÇÃO EM LOTE (BULK) ===
   const safeDepartamentos = localSettings.departamentos || [];
   const safeMetasGlobais = localSettings.metas_globais || [];
   const safeTributacoes = localSettings.tributacoes || [];
 
-  // Filtro de Empresas
   const filteredEmpresas = (localSettings.empresas_base || []).filter(e => {
     const matchSearch = e.nome.toLowerCase().includes(empresaSearch.toLowerCase());
     const matchTrib = empresaFilterTrib ? e.tributacao === empresaFilterTrib : true;
     return matchSearch && matchTrib;
   });
+
+  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.checked) {
+      setSelectedEmpresasIds(filteredEmpresas.map(emp => emp.id));
+    } else {
+      setSelectedEmpresasIds([]);
+    }
+  };
+
+  const handleSelectOne = (id: string) => {
+    if (selectedEmpresasIds.includes(id)) {
+      setSelectedEmpresasIds(selectedEmpresasIds.filter(itemId => itemId !== id));
+    } else {
+      setSelectedEmpresasIds([...selectedEmpresasIds, id]);
+    }
+  };
+
+  const applyBulkTributacao = () => {
+    if (!bulkTrib) return;
+    const updated = (localSettings.empresas_base || []).map(emp => {
+      if (selectedEmpresasIds.includes(emp.id)) {
+        return { ...emp, tributacao: bulkTrib };
+      }
+      return emp;
+    });
+    setLocalSettings({ ...localSettings, empresas_base: updated });
+    setShowBulkModal(null);
+    setSelectedEmpresasIds([]);
+    setBulkTrib('');
+  };
+
+  const applyBulkMeta = () => {
+    if (!bulkMetaId || bulkMetaTime === '' || bulkMetaTime <= 0) return;
+    const updated = (localSettings.empresas_base || []).map(emp => {
+      if (selectedEmpresasIds.includes(emp.id)) {
+        const metas = emp.metas_vinculadas || [];
+        // Só adiciona se a empresa ainda não tiver essa meta
+        if (!metas.some(m => m.metaId === bulkMetaId)) {
+          return { ...emp, metas_vinculadas: [...metas, { metaId: bulkMetaId, tempo_estimado: Number(bulkMetaTime) }] };
+        }
+      }
+      return emp;
+    });
+    setLocalSettings({ ...localSettings, empresas_base: updated });
+    setShowBulkModal(null);
+    setSelectedEmpresasIds([]);
+    setBulkMetaId('');
+    setBulkMetaTime('');
+  };
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col md:flex-row h-[75vh]">
@@ -225,7 +283,7 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
       <div className="w-full md:w-64 bg-slate-50 border-r border-slate-200 flex flex-col p-4 gap-2">
         <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2 px-2">Painel de Controle</h2>
         
-        <button onClick={() => setActiveTab('empresas')} className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all text-sm ${activeTab === 'empresas' ? 'bg-[#f0f4ff] text-[#1e3a8a] shadow-sm border border-[#dbeafe]' : 'text-slate-600 hover:bg-slate-100'}`}>
+        <button onClick={() => {setActiveTab('empresas'); setSelectedEmpresasIds([]);}} className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all text-sm ${activeTab === 'empresas' ? 'bg-[#f0f4ff] text-[#1e3a8a] shadow-sm border border-[#dbeafe]' : 'text-slate-600 hover:bg-slate-100'}`}>
           <Briefcase size={18} /> Empresas Base
         </button>
         <button onClick={() => setActiveTab('metas')} className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all text-sm ${activeTab === 'metas' ? 'bg-[#f0f4ff] text-[#1e3a8a] shadow-sm border border-[#dbeafe]' : 'text-slate-600 hover:bg-slate-100'}`}>
@@ -251,9 +309,9 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
       {/* ÁREA DE CONTEÚDO */}
       <div className="flex-1 overflow-auto p-6 md:p-8 bg-white relative">
         
-        {/* ABA: EMPRESAS BASE */}
+        {/* ABA: EMPRESAS BASE COM BULK EDIT */}
         {activeTab === 'empresas' && (
-          <div className="max-w-4xl animate-fade-in flex flex-col h-full">
+          <div className="max-w-5xl animate-fade-in flex flex-col h-full">
             <div className="flex justify-between items-start mb-6">
               <div>
                 <h3 className="text-xl font-bold text-[#1e3a8a]">Cadastro Global de Empresas</h3>
@@ -264,7 +322,7 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
               </button>
             </div>
             
-            <div className="flex flex-col sm:flex-row gap-3 mb-6 bg-slate-50 p-3 rounded-xl border border-slate-200">
+            <div className="flex flex-col sm:flex-row gap-3 mb-4 bg-slate-50 p-3 rounded-xl border border-slate-200">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
                 <input type="text" placeholder="Buscar por nome..." value={empresaSearch} onChange={(e) => setEmpresaSearch(e.target.value)} className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20" />
@@ -275,11 +333,36 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
               </select>
             </div>
 
+            {/* BARRA DE AÇÕES EM LOTE */}
+            {selectedEmpresasIds.length > 0 && (
+              <div className="bg-[#f0f4ff] border border-[#bfdbfe] p-3 rounded-xl mb-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 animate-fade-in shadow-sm">
+                <span className="text-sm font-black text-[#1e3a8a] flex items-center gap-2">
+                  <CheckSquare size={18} /> {selectedEmpresasIds.length} empresas selecionadas
+                </span>
+                <div className="flex gap-2 w-full md:w-auto">
+                  <button onClick={() => setShowBulkModal('tributacao')} className="flex-1 md:flex-none bg-white border border-[#2563eb] text-[#2563eb] hover:bg-[#dbeafe] px-4 py-2 rounded-lg text-xs font-bold transition-colors">
+                    Alterar Tributação
+                  </button>
+                  <button onClick={() => setShowBulkModal('meta')} className="flex-1 md:flex-none bg-[#2563eb] hover:bg-[#1e3a8a] text-white px-4 py-2 rounded-lg text-xs font-bold transition-colors">
+                    + Vincular Meta
+                  </button>
+                </div>
+              </div>
+            )}
+
             <div className="flex-1 bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm flex flex-col">
               <div className="overflow-y-auto flex-1">
                 <table className="w-full text-left text-sm whitespace-nowrap">
                   <thead className="bg-slate-50 text-slate-600 font-bold sticky top-0 border-b border-slate-200 z-10">
                     <tr>
+                      <th className="px-4 py-3 w-12 text-center">
+                        <input 
+                          type="checkbox" 
+                          onChange={handleSelectAll} 
+                          checked={filteredEmpresas.length > 0 && selectedEmpresasIds.length === filteredEmpresas.length} 
+                          className="w-4 h-4 text-[#2563eb] rounded border-slate-300 cursor-pointer"
+                        />
+                      </th>
                       <th className="px-4 py-3">Empresa</th>
                       <th className="px-4 py-3 text-center">Tributação</th>
                       <th className="px-4 py-3 text-center">Metas Vinculadas</th>
@@ -288,7 +371,15 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {filteredEmpresas.map(emp => (
-                      <tr key={emp.id} className="hover:bg-slate-50 group transition-colors">
+                      <tr key={emp.id} className={`hover:bg-slate-50 group transition-colors ${selectedEmpresasIds.includes(emp.id) ? 'bg-[#f0f4ff]/40' : ''}`}>
+                        <td className="px-4 py-3 text-center">
+                          <input 
+                            type="checkbox" 
+                            checked={selectedEmpresasIds.includes(emp.id)} 
+                            onChange={() => handleSelectOne(emp.id)} 
+                            className="w-4 h-4 text-[#2563eb] rounded border-slate-300 cursor-pointer"
+                          />
+                        </td>
                         <td className="px-4 py-3 font-bold text-slate-800">{emp.nome}</td>
                         <td className="px-4 py-3 text-center">
                           {emp.tributacao ? <span className="bg-slate-100 text-slate-600 px-2 py-1 rounded text-xs font-bold">{emp.tributacao}</span> : '-'}
@@ -305,7 +396,7 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
                       </tr>
                     ))}
                     {filteredEmpresas.length === 0 && (
-                      <tr><td colSpan={4} className="p-8 text-center text-slate-400 font-medium">Nenhuma empresa encontrada.</td></tr>
+                      <tr><td colSpan={5} className="p-8 text-center text-slate-400 font-medium">Nenhuma empresa encontrada.</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -324,7 +415,14 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
             
             <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 mb-8 shadow-inner">
               <div className="flex flex-col md:flex-row gap-3">
-                <input type="text" value={newMetaNome} onChange={(e) => setNewMetaNome(e.target.value)} placeholder="NOME DA META (Ex: Fechamento de Folha)" className="flex-1 px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-[#2563eb] uppercase font-bold text-sm" />
+                {/* CAMPO DE TEXTO SEM BLOQUEIO UPPERCASE FORÇADO */}
+                <input 
+                  type="text" 
+                  value={newMetaNome} 
+                  onChange={(e) => setNewMetaNome(e.target.value)} 
+                  placeholder="Nome da Meta (Ex: Fechamento de folha)" 
+                  className="flex-1 px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-[#2563eb] font-bold text-sm text-slate-700" 
+                />
                 <select value={newMetaDept} onChange={(e) => setNewMetaDept(e.target.value)} className="md:w-48 px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-[#2563eb] text-sm font-bold text-slate-700">
                   <option value="">Qual setor?</option>
                   {safeDepartamentos.map(d => <option key={d} value={d}>{d}</option>)}
@@ -429,45 +527,80 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
           </div>
         )}
 
-        {/* ABA: DEPARTAMENTOS E PARÂMETROS RESTANTES (Inalterado) */}
-        {activeTab === 'departamentos' && (
-          <div className="max-w-2xl animate-fade-in">
-            <div className="mb-6"><h3 className="text-xl font-bold text-[#1e3a8a]">Gestão de Departamentos</h3></div>
-            <div className="flex gap-2 mb-6">
-              <input type="text" value={newDepartamento} onChange={(e) => setNewDepartamento(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addItemString('departamentos', newDepartamento, setNewDepartamento)} placeholder="NOME DO NOVO SETOR" className="flex-1 px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20 uppercase font-bold" />
-              <button onClick={() => addItemString('departamentos', newDepartamento, setNewDepartamento)} className="bg-[#2563eb] hover:bg-[#1e3a8a] text-white px-4 py-2 rounded-lg font-bold"><Plus size={20} /></button>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              {safeDepartamentos.map((dept, idx) => (
-                <div key={idx} className="bg-white border border-slate-200 rounded-xl p-4 flex justify-between items-center group shadow-sm"><span className="font-bold text-slate-700">{dept}</span><button onClick={() => removeItemString('departamentos', idx)} className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100"><Trash2 size={16} /></button></div>
-              ))}
-            </div>
-          </div>
-        )}
-
+        {/* ABA: PARÂMETROS EXTRAS */}
         {activeTab === 'parametros' && (
            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in">
              <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 shadow-inner">
                <h4 className="font-bold text-[#1e3a8a] mb-4">Atividades</h4>
                <div className="flex gap-2 mb-4"><input type="text" value={newAtividade} onChange={(e) => setNewAtividade(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addItemString('atividades', newAtividade, setNewAtividade)} className="flex-1 px-3 py-2 border border-slate-300 rounded text-sm uppercase focus:outline-none focus:border-[#2563eb]"/><button onClick={() => addItemString('atividades', newAtividade, setNewAtividade)} className="bg-white border border-slate-300 p-2 rounded text-[#2563eb]"><Plus size={18}/></button></div>
-               <div className="space-y-2 max-h-[400px] overflow-auto pr-2">{(localSettings.atividades || []).map((item, idx) => (<div key={idx} className="flex justify-between bg-white p-2 rounded border group"><span className="text-sm font-medium">{item}</span><button onClick={() => removeItemString('atividades', idx)} className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100"><Trash2 size={14}/></button></div>))}</div>
+               <div className="space-y-2 max-h-[400px] overflow-auto pr-2">{(localSettings.atividades || []).map((item, idx) => (<div key={idx} className="flex justify-between items-center bg-white p-2 rounded border group"><span className="text-sm font-medium">{item}</span><button onClick={() => removeItemString('atividades', idx)} className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100"><Trash2 size={14}/></button></div>))}</div>
              </div>
              <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 shadow-inner">
                <h4 className="font-bold text-[#1e3a8a] mb-4">Prioridades</h4>
                <div className="flex gap-2 mb-4"><input type="text" value={newPrioridade} onChange={(e) => setNewPrioridade(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addItemString('prioridades', newPrioridade, setNewPrioridade)} className="flex-1 px-3 py-2 border border-slate-300 rounded text-sm uppercase focus:outline-none focus:border-[#2563eb]"/><button onClick={() => addItemString('prioridades', newPrioridade, setNewPrioridade)} className="bg-white border border-slate-300 p-2 rounded text-[#2563eb]"><Plus size={18}/></button></div>
-               <div className="space-y-2 max-h-[400px] overflow-auto pr-2">{(localSettings.prioridades || []).map((item, idx) => (<div key={idx} className="flex justify-between bg-white p-2 rounded border group"><span className="text-sm font-bold">{item}</span><button onClick={() => removeItemString('prioridades', idx)} className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100"><Trash2 size={14}/></button></div>))}</div>
+               <div className="space-y-2 max-h-[400px] overflow-auto pr-2">{(localSettings.prioridades || []).map((item, idx) => (<div key={idx} className="flex justify-between items-center bg-white p-2 rounded border group"><span className="text-sm font-bold">{item}</span><button onClick={() => removeItemString('prioridades', idx)} className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100"><Trash2 size={14}/></button></div>))}</div>
              </div>
              <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 shadow-inner">
                <h4 className="font-bold text-[#1e3a8a] mb-4">Tributações</h4>
                <div className="flex gap-2 mb-4"><input type="text" value={newTributacao} onChange={(e) => setNewTributacao(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addItemString('tributacoes', newTributacao, setNewTributacao)} className="flex-1 px-3 py-2 border border-slate-300 rounded text-sm uppercase focus:outline-none focus:border-[#2563eb]"/><button onClick={() => addItemString('tributacoes', newTributacao, setNewTributacao)} className="bg-white border border-slate-300 p-2 rounded text-[#2563eb]"><Plus size={18}/></button></div>
-               <div className="space-y-2 max-h-[400px] overflow-auto pr-2">{(localSettings.tributacoes || []).map((item, idx) => (<div key={idx} className="flex justify-between bg-white p-2 rounded border group"><span className="text-sm font-medium">{item}</span><button onClick={() => removeItemString('tributacoes', idx)} className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100"><Trash2 size={14}/></button></div>))}</div>
+               <div className="space-y-2 max-h-[400px] overflow-auto pr-2">{(localSettings.tributacoes || []).map((item, idx) => (<div key={idx} className="flex justify-between items-center bg-white p-2 rounded border group"><span className="text-sm font-medium">{item}</span><button onClick={() => removeItemString('tributacoes', idx)} className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100"><Trash2 size={14}/></button></div>))}</div>
              </div>
            </div>
         )}
-
       </div>
 
-      {/* MODAL DE EDIÇÃO DE EMPRESA E VINCULAÇÃO DE METAS */}
+      {/* MODAIS (CRIAR EMPRESA E AÇÕES EM LOTE) */}
+      
+      {/* 1. Modal Ações em Lote */}
+      {showBulkModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[110] p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-fade-in">
+            <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-[#f0f4ff]">
+              <h2 className="text-lg font-black text-[#1e3a8a]">
+                {showBulkModal === 'tributacao' ? 'Alterar Tributação em Lote' : 'Vincular Meta em Lote'}
+              </h2>
+              <button onClick={() => setShowBulkModal(null)} className="text-slate-400 hover:text-red-500"><X size={20}/></button>
+            </div>
+            <div className="p-5">
+              <p className="text-sm text-slate-600 mb-4">Você selecionou <b>{selectedEmpresasIds.length} empresas</b> para esta ação.</p>
+              
+              {showBulkModal === 'tributacao' && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nova Tributação</label>
+                  <select value={bulkTrib} onChange={(e) => setBulkTrib(e.target.value)} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:border-[#2563eb] font-bold text-slate-700">
+                    <option value="">Selecione...</option>
+                    {safeTributacoes.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+              )}
+
+              {showBulkModal === 'meta' && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Selecione a Meta</label>
+                    <select value={bulkMetaId} onChange={(e) => setBulkMetaId(e.target.value)} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:border-[#2563eb] font-bold text-slate-700 text-sm">
+                      <option value="">Escolha a meta...</option>
+                      {safeMetasGlobais.map(m => <option key={m.id} value={m.id}>{m.nome} ({m.departamento})</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Tempo Est. (Dias) para todas</label>
+                    <input type="number" step="0.5" min="0" value={bulkMetaTime} onChange={(e) => setBulkMetaTime(Number(e.target.value))} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:border-[#2563eb] font-bold text-slate-700" placeholder="Ex: 1.5" />
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
+              <button onClick={() => setShowBulkModal(null)} className="px-5 py-2 text-slate-600 font-bold hover:bg-slate-200 rounded-xl transition-colors">Cancelar</button>
+              <button onClick={showBulkModal === 'tributacao' ? applyBulkTributacao : applyBulkMeta} disabled={showBulkModal === 'tributacao' ? !bulkTrib : (!bulkMetaId || bulkMetaTime === '')} className="px-6 py-2 bg-[#2563eb] hover:bg-[#1e3a8a] text-white font-bold rounded-xl transition-colors shadow-sm disabled:opacity-50">
+                Aplicar a Todas
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 2. Modal Editar/Nova Empresa Individual */}
       {isEmpresaModalOpen && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden animate-fade-in">
@@ -480,7 +613,6 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
             </div>
             
             <div className="p-6 flex-1 overflow-y-auto space-y-6">
-              {/* Dados Base */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome da Empresa</label>
@@ -497,7 +629,6 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
 
               <hr className="border-slate-100"/>
 
-              {/* Vinculação de Metas */}
               <div>
                 <h4 className="text-sm font-black text-[#1e3a8a] uppercase tracking-wider flex items-center gap-2 mb-3">
                   <Target size={16}/> Metas Vinculadas ({empresaMetas.length})
