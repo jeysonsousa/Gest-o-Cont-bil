@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Client, MONTHS, Status, AppSettings, StatusRecord } from '../types';
+import { Client, MONTHS, Status, AppSettings, StatusRecord, UsuarioConfig } from '../types';
 import { StatusIndicator } from './StatusIndicator';
 import { SettingsPanel } from './SettingsPanel';
 import { Search, Plus, ArrowUpDown, Edit2, Trash2, X, UserCheck, EyeOff, Download } from 'lucide-react';
@@ -72,6 +72,24 @@ export function Dashboard({ isAdmin, currentDepartment }: DashboardProps) {
     }
     fetchData();
   }, [currentDepartment]);
+
+  // Cria a lista de responsáveis filtrando os usuários do setor atual
+  const responsaveisDoDepartamento = useMemo(() => {
+    let users: UsuarioConfig[] = [];
+    if (typeof settings.usuarios === 'string') {
+      try { users = JSON.parse(settings.usuarios); } catch (e) {}
+    } else if (Array.isArray(settings.usuarios)) {
+      users = settings.usuarios;
+    }
+    
+    // Filtra apenas os usuários que têm o departamento atual marcado
+    let deptUsers = users.filter(u => u.departamentos && u.departamentos.includes(currentDepartment));
+    
+    // Fallback: se nenhum usuário foi vinculado ainda, mostra todos para não quebrar o cadastro
+    if (deptUsers.length === 0) deptUsers = users;
+    
+    return [...new Set(deptUsers.map(u => u.nome))].sort();
+  }, [settings.usuarios, currentDepartment]);
 
   const activeAnalysts = useMemo(() => {
     const list = clients.filter(c => !c.is_inactive).map(c => c.responsavel);
@@ -420,11 +438,12 @@ export function Dashboard({ isAdmin, currentDepartment }: DashboardProps) {
                 <p className="text-[10px] text-slate-400 mt-1">As empresas são cadastradas na aba "Configurações &gt; Empresas Base".</p>
               </div>
 
+              {/* LISTA DE RESPONSÁVEIS INTELIGENTE (FILTRADA POR DEPARTAMENTO) */}
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Responsável</label>
                 <select required value={formData.responsavel || ''} onChange={(e) => setFormData({...formData, responsavel: e.target.value})} className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-[#2563eb]">
                   <option value="">Selecione...</option>
-                  {settings.responsaveis.map(r => <option key={r} value={r}>{r}</option>)}
+                  {responsaveisDoDepartamento.map(r => <option key={r} value={r}>{r}</option>)}
                 </select>
               </div>
               <div className="grid grid-cols-2 gap-4">
