@@ -49,7 +49,6 @@ export function Dashboard({ isAdmin, currentDepartment }: DashboardProps) {
   const [activeMonth, setActiveMonth] = useState<string>(MONTHS[defaultMonthIndex]);
   const [activeYear, setActiveYear] = useState<string>(defaultYearNum.toString());
 
-  // Carrega os dados
   useEffect(() => {
     async function fetchData() {
       if (!currentDepartment) return;
@@ -73,7 +72,6 @@ export function Dashboard({ isAdmin, currentDepartment }: DashboardProps) {
     fetchData();
   }, [currentDepartment]);
 
-  // Filtra Responsáveis baseados no Departamento
   const responsaveisDoDepartamento = useMemo(() => {
     let users: UsuarioConfig[] = [];
     if (typeof settings.usuarios === 'string') {
@@ -82,7 +80,7 @@ export function Dashboard({ isAdmin, currentDepartment }: DashboardProps) {
       users = settings.usuarios;
     }
     let deptUsers = users.filter(u => u.departamentos && u.departamentos.includes(currentDepartment));
-    if (deptUsers.length === 0) deptUsers = users; // Fallback
+    if (deptUsers.length === 0) deptUsers = users; 
     return [...new Set(deptUsers.map(u => u.nome))].sort();
   }, [settings.usuarios, currentDepartment]);
 
@@ -91,7 +89,6 @@ export function Dashboard({ isAdmin, currentDepartment }: DashboardProps) {
     return [...new Set(list)].sort();
   }, [clients]);
 
-  // Filtra as Empresas Base disponíveis para alocação (evita duplicar empresa no mesmo departamento)
   const empresasDisponiveis = useMemo(() => {
     const alocadas = clients.map(c => c.empresa);
     return (settings.empresas_base || []).filter(e => 
@@ -221,17 +218,14 @@ export function Dashboard({ isAdmin, currentDepartment }: DashboardProps) {
     document.body.removeChild(link);
   };
 
-  // MÁGICA: Ao selecionar uma empresa base, preenche tudo sozinho!
   const handleEmpresaBaseChange = (empresaId: string) => {
     setSelectedEmpresaBaseId(empresaId);
     const emp = (settings.empresas_base || []).find(e => e.id === empresaId);
     
     if (emp) {
-      // Pega todas as metas globais deste departamento
       const deptMetasGlobais = (settings.metas_globais || []).filter(m => m.departamento === currentDepartment);
       const deptMetaIds = deptMetasGlobais.map(m => m.id);
 
-      // Soma o tempo das metas que estão vinculadas na empresa E pertencem ao departamento
       let totalTime = 0;
       (emp.metas_vinculadas || []).forEach(mv => {
         if (deptMetaIds.includes(mv.metaId)) {
@@ -243,7 +237,7 @@ export function Dashboard({ isAdmin, currentDepartment }: DashboardProps) {
         ...formData,
         empresa: emp.nome,
         tributacao: emp.tributacao,
-        tempo_estimado: totalTime
+        tempo_estimado: totalTime // Salva o tempo silenciosamente no banco
       });
     } else {
       setFormData({ ...formData, empresa: '', tributacao: '', tempo_estimado: 0 });
@@ -254,7 +248,6 @@ export function Dashboard({ isAdmin, currentDepartment }: DashboardProps) {
     if (client) {
       setEditingClient(client);
       setFormData(client);
-      // Tenta achar o ID da empresa para marcar no Select
       const empBase = (settings.empresas_base || []).find(e => e.nome === client.empresa);
       setSelectedEmpresaBaseId(empBase ? empBase.id : '');
     } else {
@@ -486,29 +479,15 @@ export function Dashboard({ isAdmin, currentDepartment }: DashboardProps) {
                 </div>
               </div>
               
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Tributação</label>
-                  <input 
-                    type="text" 
-                    value={formData.tributacao || ''} 
-                    disabled 
-                    className="w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-lg text-slate-500 font-bold cursor-not-allowed"
-                    title="Herdado do Cadastro Global"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center justify-between">
-                    Tempo Est. (Dias)
-                  </label>
-                  <input 
-                    type="number" 
-                    value={formData.tempo_estimado || 0} 
-                    disabled 
-                    className="w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-lg text-slate-500 font-bold cursor-not-allowed"
-                    title="Soma do tempo das metas configuradas para este setor no Cadastro Global"
-                  />
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Tributação</label>
+                <input 
+                  type="text" 
+                  value={formData.tributacao || ''} 
+                  disabled 
+                  className="w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-lg text-slate-500 font-bold cursor-not-allowed"
+                  title="Herdado do Cadastro Global"
+                />
               </div>
               
               <div className="flex flex-col gap-2 pt-2">
