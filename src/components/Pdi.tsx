@@ -29,9 +29,6 @@ const formatDateForSearch = (dateStr?: string) => {
   return dateStr;
 };
 
-// LISTA DE ADMINISTRADORES DO SISTEMA (Para destravar validação do Gestor)
-const ADMIN_EMAILS = ['jeyson@vsmweb.com.br', 'cristiane.cardoso@vsmweb.com.br'];
-
 export function Pdi({ currentDepartment }: { currentDepartment: string }) {
   const [isAdmin, setIsAdmin] = useState(false);
   const [userEmail, setUserEmail] = useState('');
@@ -57,7 +54,6 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
     supabase.auth.getSession().then(({ data }) => {
       const email = data.session?.user.email?.toLowerCase().trim() || '';
       setUserEmail(email);
-      setIsAdmin(ADMIN_EMAILS.includes(email));
       setAuthLoaded(true);
     });
   }, []);
@@ -80,14 +76,21 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
         const usuariosConfig: UsuarioConfig[] = rawUsuarios;
         setDebugUsuarios(usuariosConfig); 
         
+        // Definição de Admin Master + Dinâmico
+        let userIsAdmin = userEmail === 'jeyson@vsmweb.com.br';
+        const myConfig = usuariosConfig.find(u => u.email === userEmail);
+        if (myConfig && myConfig.isAdmin) {
+           userIsAdmin = true;
+        }
+        setIsAdmin(userIsAdmin);
+
         const list = (clientsData || []).filter(c => !c.is_inactive).map(c => c.responsavel);
         let allowedAnalysts: string[] = [];
         
-        if (isAdmin) {
+        if (userIsAdmin) {
           const configuredNames = usuariosConfig.map(u => u.nome.toUpperCase());
           allowedAnalysts = [...new Set([...list.map(n => n.toUpperCase()), ...configuredNames])].sort();
         } else {
-          const myConfig = usuariosConfig.find(u => u.email.toLowerCase().trim() === userEmail);
           if (myConfig) {
             allowedAnalysts = [myConfig.nome.toUpperCase()];
           } else {
@@ -101,7 +104,7 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
       }
     }
     fetchRoles();
-  }, [authLoaded, isAdmin, userEmail, currentDepartment]);
+  }, [authLoaded, userEmail, currentDepartment]);
 
   useEffect(() => {
     async function fetchPdiData() {
