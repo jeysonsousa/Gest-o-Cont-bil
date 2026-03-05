@@ -44,22 +44,20 @@ export interface UsuarioConfig {
   nome: string;
   email: string;
   departamentos?: string[]; 
+  isEstagiario?: boolean; // NOVO: Indicador de meio expediente fixo
 }
 
-// NOVO: Estrutura da Meta Global
 export interface MetaGlobal {
   id: string;
   nome: string;
   departamento: string; 
 }
 
-// NOVO: O Vínculo da Meta com o Tempo dentro da Empresa
 export interface MetaVinculada {
   metaId: string;
   tempo_estimado: number;
 }
 
-// NOVO: A Empresa agora guarda suas metas!
 export interface EmpresaBase {
   id: string;
   nome: string;
