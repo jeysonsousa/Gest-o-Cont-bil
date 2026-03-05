@@ -8,7 +8,7 @@ import { supabase } from './supabase';
 import { Dashboard } from './components/Dashboard';
 import { Pdi } from './components/Pdi';
 import { Produtividade } from './components/Produtividade';
-import { SettingsPanel } from './components/SettingsPanel'; // Importamos o painel aqui para a raiz!
+import { SettingsPanel } from './components/SettingsPanel'; 
 import { Login } from './components/Login'; 
 import { AppSettings, UsuarioConfig } from './types';
 import { 
@@ -24,33 +24,25 @@ import {
   Timer,
   Building2,
   ShieldAlert,
-  Settings // Ícone de configurações
+  Settings 
 } from 'lucide-react';
 
 export default function App() {
   const [session, setSession] = useState<any>(null);
   const [authLoading, setAuthLoading] = useState(true);
-  
-  // Rota Global agora inclui 'settings'
   const [currentRoute, setCurrentRoute] = useState<'dashboard' | 'pdi' | 'produtividade' | 'settings'>('dashboard');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  
-  // ESTADOS DO DEPARTAMENTO DINÂMICO E ACESSOS
   const [currentDepartment, setCurrentDepartment] = useState<string>('');
   const [allowedDepts, setAllowedDepts] = useState<string[]>([]);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
-  
-  // Estado Global das Configurações
   const [globalSettings, setGlobalSettings] = useState<AppSettings | null>(null);
-
-  // Estados da TV
   const [isTvMode, setIsTvMode] = useState(false);
   const [tvInterval, setTvInterval] = useState<number>(5); 
   const [showTvSettings, setShowTvSettings] = useState(false);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
-    if (isTvMode && currentRoute !== 'settings') { // A TV não gira se estiver nas configurações
+    if (isTvMode && currentRoute !== 'settings') { 
       interval = setInterval(() => {
         setCurrentRoute(prevRoute => prevRoute === 'dashboard' ? 'produtividade' : 'dashboard');
       }, tvInterval * 60 * 1000); 
@@ -58,7 +50,6 @@ export default function App() {
     return () => { if (interval) clearInterval(interval); };
   }, [isTvMode, tvInterval, currentRoute]);
 
-  // Carrega Sessão
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
@@ -70,7 +61,6 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Carrega Permissões e Configurações Globais
   useEffect(() => {
     if (!session) return;
     
@@ -105,7 +95,7 @@ export default function App() {
       setSettingsLoaded(true);
     }
     loadAccess();
-  }, [session, currentRoute]); // Recarrega se a rota mudar (para puxar configs salvas)
+  }, [session, currentRoute]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -132,8 +122,6 @@ export default function App() {
 
   return (
     <div className="flex h-screen bg-slate-100 overflow-hidden font-sans">
-      
-      {/* BARRA LATERAL */}
       <div className={`${isSidebarCollapsed ? 'w-20' : 'w-64'} bg-white border-r border-slate-200 flex flex-col shadow-sm z-50 transition-all duration-300 ease-in-out relative`}>
         <button 
           onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
@@ -142,19 +130,18 @@ export default function App() {
           {isSidebarCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
         </button>
 
-        {/* LOGO */}
         <div className={`p-6 border-b border-slate-100 flex flex-col items-center justify-center min-h-[120px] transition-all ${isSidebarCollapsed ? 'p-2 min-h-[80px]' : ''}`}>
           {!isSidebarCollapsed ? (
             <>
               <img src="/logo.png" alt="VSM" className="h-10 object-contain mb-3" onError={(e) => {(e.target as HTMLImageElement).style.display = 'none';}} />
-              <span className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] bg-slate-50 px-3 py-1 rounded-full border border-slate-100">Gestão 360º</span>
+              {/* Tag Gestão 360º atualizada com cor e tamanho maiores */}
+              <span className="text-xs font-black text-[#1e3a8a] uppercase tracking-widest bg-[#dbeafe] px-3 py-1 rounded-full border border-[#bfdbfe]">Gestão 360º</span>
             </>
           ) : (
              <img src="/guia.png" alt="VSM" className="h-8 object-contain" />
           )}
         </div>
         
-        {/* SELETOR DE DEPARTAMENTO (Oculto se estiver nas configurações) */}
         {!isSidebarCollapsed && currentRoute !== 'settings' && allowedDepts.length > 0 && (
           <div className="px-4 pt-4 pb-2 animate-fade-in">
             <div className="bg-slate-50 border border-slate-200 rounded-xl p-2 flex flex-col gap-1">
@@ -188,30 +175,32 @@ export default function App() {
             {!isSidebarCollapsed && <span className="text-sm whitespace-nowrap">Produtividade</span>}
           </button>
 
-          {/* NOVO BOTÃO DE CONFIGURAÇÕES GERAIS (Apenas Admin) */}
           {isAdmin && (
             <>
               <div className="my-4 border-t border-slate-200"></div>
+              {/* Menu renomeado para Configurações */}
               <button onClick={() => setCurrentRoute('settings')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${currentRoute === 'settings' ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'} ${isSidebarCollapsed ? 'justify-center px-0' : ''}`}>
                 <Settings size={22} className={currentRoute === 'settings' ? 'text-slate-300' : ''} />
-                {!isSidebarCollapsed && <span className="text-sm whitespace-nowrap">Configurações Base</span>}
+                {!isSidebarCollapsed && <span className="text-sm whitespace-nowrap">Configurações</span>}
               </button>
             </>
           )}
         </nav>
 
-        {/* RODAPÉ DA SIDEBAR */}
         <div className="p-4 border-t border-slate-50">
           <div className="bg-slate-50 rounded-xl p-3 flex flex-col items-center border border-slate-100 relative">
             {!isSidebarCollapsed && currentRoute !== 'settings' && (
               <div className="absolute -top-3 left-2 flex items-center gap-1 z-50">
-                <div className="group relative">
-                  <button onClick={() => { setIsTvMode(!isTvMode); setShowTvSettings(false); }} className={`bg-white border p-1 rounded-full shadow-sm transition-colors ${isTvMode ? 'border-emerald-200 text-emerald-500 hover:bg-emerald-50' : 'border-slate-200 text-slate-400 hover:text-[#2563eb] hover:bg-[#f0f4ff]'}`}>
+                <div className="group relative flex">
+                  <button onClick={() => { setIsTvMode(!isTvMode); setShowTvSettings(false); }} className={`bg-white border p-1 rounded-full shadow-sm transition-colors relative z-10 ${isTvMode ? 'border-emerald-200 text-emerald-500 hover:bg-emerald-50' : 'border-slate-200 text-slate-400 hover:text-[#2563eb] hover:bg-[#f0f4ff]'}`}>
                     {isTvMode ? <Pause size={12} /> : <MonitorPlay size={12} />}
                   </button>
+                  <div className="absolute bottom-full left-0 mb-2 w-48 bg-slate-800 text-white text-[10px] font-medium p-2.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none text-center shadow-xl z-50">
+                    {isTvMode ? `Modo TV Ativado. Gira a cada ${tvInterval} min.` : "Ativar Gestão à Vista. Gira as abas automaticamente."}
+                  </div>
                 </div>
-                <div className="relative">
-                  <button onClick={() => setShowTvSettings(!showTvSettings)} className={`bg-white border p-1 rounded-full shadow-sm transition-colors ${showTvSettings ? 'border-[#2563eb] text-[#2563eb] bg-[#f0f4ff]' : 'border-slate-200 text-slate-400 hover:text-[#2563eb] hover:bg-[#f0f4ff]'}`}>
+                <div className="group relative flex">
+                  <button onClick={() => setShowTvSettings(!showTvSettings)} className={`bg-white border p-1 rounded-full shadow-sm transition-colors relative z-10 ${showTvSettings ? 'border-[#2563eb] text-[#2563eb] bg-[#f0f4ff]' : 'border-slate-200 text-slate-400 hover:text-[#2563eb] hover:bg-[#f0f4ff]'}`}>
                     <Timer size={12} />
                   </button>
                   {showTvSettings && (
@@ -229,7 +218,8 @@ export default function App() {
             {!isSidebarCollapsed && (
               <>
                 <span className="text-xs font-bold text-slate-700 truncate w-full text-center mt-2" title={userEmail}>{userEmail}</span>
-                {isAdmin ? <span className="text-[9px] bg-[#dbeafe] text-[#1e3a8a] px-2 py-0.5 rounded-md font-bold uppercase tracking-widest mt-2 border border-[#bfdbfe]">Admin Geral</span> : <span className="text-[9px] bg-slate-200 text-slate-600 px-2 py-0.5 rounded-md font-bold uppercase tracking-widest mt-2">Analista</span>}
+                {/* Texto e cor alterados para o Admin */}
+                {isAdmin ? <span className="text-[9px] bg-[#dbeafe] text-[#1e3a8a] px-2 py-0.5 rounded-md font-bold uppercase tracking-widest mt-2 border border-[#bfdbfe]">Admin do Sistema</span> : <span className="text-[9px] bg-slate-200 text-slate-600 px-2 py-0.5 rounded-md font-bold uppercase tracking-widest mt-2">Analista</span>}
                 <button onClick={handleLogout} className="mt-3 flex items-center justify-center gap-2 w-full px-3 py-2 text-xs font-bold text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-transparent hover:border-red-100"><LogOut size={14} /> Sair</button>
               </>
             )}
@@ -237,11 +227,22 @@ export default function App() {
             {isSidebarCollapsed && (
                <button onClick={handleLogout} className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Sair"><LogOut size={18} /></button>
             )}
+
+            {/* O Botão de Informação restaurado com seus Tooltips */}
+            {!isSidebarCollapsed && (
+              <div className="absolute -top-3 -right-2 group flex z-50">
+                <button className="bg-white border border-slate-200 text-slate-400 p-1 rounded-full hover:text-[#2563eb] hover:bg-[#f0f4ff] transition-colors shadow-sm cursor-help relative z-10"><Info size={12} /></button>
+                <div className="absolute bottom-full right-0 mb-2 w-48 bg-slate-800 text-white text-[10px] font-medium p-2.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none text-center shadow-xl z-50">
+                  Sistema desenvolvido por:<br/>
+                  <strong className="text-[#60a5fa] uppercase tracking-wider block mt-1">Jeyson Lins</strong>
+                  <span className="opacity-80">jeyson.cont@gmail.com</span>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
 
-      {/* ÁREA CENTRAL */}
       <div className="flex-1 overflow-auto bg-slate-50">
         {currentRoute === 'settings' && globalSettings ? (
           <div className="p-6 h-full flex flex-col max-w-[1600px] mx-auto">
