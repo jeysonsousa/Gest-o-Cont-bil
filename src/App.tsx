@@ -27,7 +27,6 @@ import {
   Settings 
 } from 'lucide-react';
 
-// LISTA DE ADMINISTRADORES DO SISTEMA (Fallback)
 const ADMIN_EMAILS = ['jeyson@vsmweb.com.br', 'cristiane.cardoso@vsmweb.com.br'];
 
 export default function App() {
@@ -65,8 +64,11 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
+  // EXTRAÍMOS O USER_ID PARA BLINDAR A TELA CONTRA REFRESHES DE ABA
+  const userId = session?.user?.id;
+
   useEffect(() => {
-    if (!session) {
+    if (!userId) {
       setSettingsLoaded(false);
       return;
     }
@@ -78,7 +80,7 @@ export default function App() {
         const globalDepts = data.departamentos || ['Contábil', 'Fiscal', 'Pessoal'];
         const email = session.user.email.toLowerCase().trim();
         
-        let isUserAdmin = ADMIN_EMAILS.includes(email); // Segurança Master + Lista Hardcoded
+        let isUserAdmin = ADMIN_EMAILS.includes(email);
         
         let users: UsuarioConfig[] = [];
         if (typeof data.usuarios === 'string') {
@@ -94,13 +96,14 @@ export default function App() {
 
         setIsAdminState(isUserAdmin);
 
+        // LÓGICA CORRIGIDA: Só altera o departamento se a pessoa ainda não tiver escolhido nenhum
         if (isUserAdmin) {
           setAllowedDepts(globalDepts);
-          setCurrentDepartment(globalDepts[0] || '');
+          setCurrentDepartment(prev => prev && globalDepts.includes(prev) ? prev : (globalDepts[0] || ''));
         } else {
           if (myConfig && myConfig.departamentos && myConfig.departamentos.length > 0) {
             setAllowedDepts(myConfig.departamentos);
-            setCurrentDepartment(myConfig.departamentos[0]);
+            setCurrentDepartment(prev => prev && myConfig.departamentos!.includes(prev) ? prev : myConfig.departamentos![0]);
           } else {
             setAllowedDepts([]); 
           }
@@ -109,20 +112,14 @@ export default function App() {
       setSettingsLoaded(true);
     }
     loadAccess();
-  }, [session, currentRoute]);
+  }, [userId, currentRoute]); // Dependência alterada para não resetar quando trocar de aba
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
   };
 
-  // === A CORREÇÃO ESTÁ AQUI NESTA ORDEM EXATA ===
-  // 1. Verifica se a autenticação do Firebase/Supabase terminou
   if (authLoading) return <div className="min-h-screen bg-slate-50 flex items-center justify-center font-bold text-[#2563eb]">Autenticando...</div>;
-  
-  // 2. SE NÃO ESTIVER LOGADO, MOSTRA O LOGIN IMEDIATAMENTE (O bug estava aqui)
   if (!session) return <Login />;
-  
-  // 3. Só tenta mostrar a tela de "Carregando acessos" se a pessoa JÁ ESTIVER LOGADA
   if (!settingsLoaded) return <div className="min-h-screen bg-slate-50 flex items-center justify-center font-bold text-[#2563eb]">Carregando acessos do sistema...</div>;
 
   const userEmail = session.user.email?.toLowerCase().trim() || '';
