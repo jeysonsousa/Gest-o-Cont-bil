@@ -30,7 +30,7 @@ interface DashboardProps {
 export function Dashboard({ isAdmin, currentDepartment }: DashboardProps) {
   const [clients, setClients] = useState<Client[]>([]);
   const [settings, setSettings] = useState<AppSettings>({
-    responsaveis: [], atividades: [], prioridades: [], tributacoes: [], empresas: []
+    responsaveis: [], atividades: [], prioridades: [], tributacoes: [], empresas: [], departamentos: []
   });
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'dashboard' | 'settings'>('dashboard');
@@ -50,14 +50,15 @@ export function Dashboard({ isAdmin, currentDepartment }: DashboardProps) {
   const [activeMonth, setActiveMonth] = useState<string>(MONTHS[defaultMonthIndex]);
   const [activeYear, setActiveYear] = useState<string>(defaultYearNum.toString());
 
-  // RECARREGA OS CLIENTES SEMPRE QUE O DEPARTAMENTO MUDAR
+  // RECARREGA OS DADOS QUANDO O DEPARTAMENTO MUDA
   useEffect(() => {
     async function fetchData() {
+      if (!currentDepartment) return;
       try {
         setLoading(true);
         const { data: clientsData } = await supabase.from('clients')
           .select('*')
-          .eq('departamento', currentDepartment) // Filtro por Departamento
+          .eq('departamento', currentDepartment)
           .order('created_at', { ascending: true });
           
         const { data: settingsData } = await supabase.from('settings').select('*').eq('id', 1).single();
@@ -206,7 +207,6 @@ export function Dashboard({ isAdmin, currentDepartment }: DashboardProps) {
       setFormData(client);
     } else {
       setEditingClient(null);
-      // Já injeta o departamento atual ao criar um novo cliente
       setFormData({ responsavel: '', empresa: '', atividade: '', prioridade: 'A', tributacao: '', sem_movimento: false, is_inactive: false, tempo_estimado: 0, status: {}, departamento: currentDepartment });
     }
     setIsModalOpen(true);
@@ -214,7 +214,7 @@ export function Dashboard({ isAdmin, currentDepartment }: DashboardProps) {
 
   const handleSaveClient = async (e: React.FormEvent) => {
     e.preventDefault();
-    const payload = { ...formData, departamento: currentDepartment }; // Garante a gravação no departamento correto
+    const payload = { ...formData, departamento: currentDepartment }; 
     
     if (editingClient) {
       const { error } = await supabase.from('clients').update(payload).eq('id', editingClient.id);
@@ -411,10 +411,17 @@ export function Dashboard({ isAdmin, currentDepartment }: DashboardProps) {
               <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600 transition-colors"><X size={20} /></button>
             </div>
             <form onSubmit={handleSaveClient} className="p-6 space-y-4">
+              
+              {/* O NOVO CAMPO DE SELEÇÃO GLOBAL DE EMPRESA */}
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Empresa</label>
-                <input type="text" required value={formData.empresa || ''} onChange={(e) => setFormData({...formData, empresa: e.target.value.toUpperCase()})} className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20 uppercase font-bold" placeholder="Nome da Empresa" />
+                <label className="block text-sm font-medium text-slate-700 mb-1">Empresa Base</label>
+                <select required value={formData.empresa || ''} onChange={(e) => setFormData({...formData, empresa: e.target.value})} className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-[#2563eb] font-bold text-slate-800">
+                  <option value="">Selecione uma empresa...</option>
+                  {(settings.empresas || []).map(emp => <option key={emp} value={emp}>{emp}</option>)}
+                </select>
+                <p className="text-[10px] text-slate-400 mt-1">As empresas são cadastradas na aba "Configurações > Empresas Base".</p>
               </div>
+
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Responsável</label>
                 <select required value={formData.responsavel || ''} onChange={(e) => setFormData({...formData, responsavel: e.target.value})} className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-[#2563eb]">
