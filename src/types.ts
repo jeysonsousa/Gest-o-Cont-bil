@@ -59,12 +59,21 @@ export interface MetaVinculada {
   tempo_estimado: number;
 }
 
+// NOVO: Estrutura da Matriz de Departamentos
+export interface DeptAlocacao {
+  responsavel: string;
+  prioridade: string;
+  sem_movimento: boolean;
+}
+
 export interface EmpresaBase {
   id: string;
   nome: string;
   tributacao: string;
+  atividade?: string; // NOVO: Transferido do painel para o Global
   metas_vinculadas?: MetaVinculada[];
-  is_inactive?: boolean; // NOVO: Controle de inativação global
+  is_inactive?: boolean; 
+  alocacoes?: Record<string, DeptAlocacao>; // NOVO: Matriz de controle
 }
 
 export interface AppSettings {
