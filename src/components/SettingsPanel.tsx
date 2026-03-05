@@ -14,7 +14,6 @@ interface SettingsPanelProps {
 
 const generateId = () => window.crypto?.randomUUID ? window.crypto.randomUUID() : Math.random().toString(36).substr(2, 9);
 
-// Função para formatar as Metas (Primeira letra maiúscula)
 const capitalizeFirstLetter = (str: string) => {
   if (!str) return '';
   return str.charAt(0).toUpperCase() + str.slice(1);
@@ -35,6 +34,7 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
   const [newUserNome, setNewUserNome] = useState('');
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserDepts, setNewUserDepts] = useState<string[]>([]);
+  const [newUserIsEstagiario, setNewUserIsEstagiario] = useState(false); // NOVO ESTADO
 
   const [newMetaNome, setNewMetaNome] = useState('');
   const [newMetaDept, setNewMetaDept] = useState('');
@@ -51,7 +51,6 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
   const [selectedMetaIdToLink, setSelectedMetaIdToLink] = useState('');
   const [selectedMetaTimeToLink, setSelectedMetaTimeToLink] = useState<number | ''>('');
 
-  // === ESTADOS PARA EDIÇÃO EM LOTE (BULK) ===
   const [selectedEmpresasIds, setSelectedEmpresasIds] = useState<string[]>([]);
   const [showBulkModal, setShowBulkModal] = useState<'tributacao' | 'meta' | null>(null);
   const [bulkTrib, setBulkTrib] = useState('');
@@ -72,7 +71,7 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
     } else if (Array.isArray(settings.usuarios)) {
       parsedUsers = settings.usuarios;
     }
-    setUsuarios(parsedUsers.map(u => ({ ...u, departamentos: u.departamentos || [] })));
+    setUsuarios(parsedUsers.map(u => ({ ...u, departamentos: u.departamentos || [], isEstagiario: u.isEstagiario || false })));
   }, [settings]);
 
   const handleSave = async () => {
@@ -104,7 +103,12 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
     if (!newUserNome.trim() || !newUserEmail.trim() || newUserDepts.length === 0) return;
     
     const updatedUsers = [...usuarios];
-    const userData = { nome: newUserNome.toUpperCase().trim(), email: newUserEmail.toLowerCase().trim(), departamentos: newUserDepts };
+    const userData = { 
+      nome: newUserNome.toUpperCase().trim(), 
+      email: newUserEmail.toLowerCase().trim(), 
+      departamentos: newUserDepts,
+      isEstagiario: newUserIsEstagiario // Salva se é estagiário
+    };
     
     if (editingUserIndex !== null) {
       updatedUsers[editingUserIndex] = userData;
@@ -114,7 +118,7 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
     }
     
     setUsuarios(updatedUsers);
-    setNewUserNome(''); setNewUserEmail(''); setNewUserDepts([]);
+    setNewUserNome(''); setNewUserEmail(''); setNewUserDepts([]); setNewUserIsEstagiario(false);
   };
 
   const editUser = (index: number) => {
@@ -122,6 +126,7 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
     setNewUserNome(user.nome);
     setNewUserEmail(user.email);
     setNewUserDepts(user.departamentos || []);
+    setNewUserIsEstagiario(user.isEstagiario || false);
     setEditingUserIndex(index);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -134,13 +139,30 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
     }
   };
 
-  // === LÓGICA: METAS GLOBAIS ===
+  const toggleNewUserDept = (dept: string) => {
+    if (newUserDepts.includes(dept)) {
+      setNewUserDepts(newUserDepts.filter(d => d !== dept));
+    } else {
+      setNewUserDepts([...newUserDepts, dept]);
+    }
+  };
+
+  const toggleExistingUserDept = (userIndex: number, dept: string) => {
+    const updatedUsers = [...usuarios];
+    const user = updatedUsers[userIndex];
+    if (user.departamentos?.includes(dept)) {
+      user.departamentos = user.departamentos.filter(d => d !== dept);
+    } else {
+      user.departamentos = [...(user.departamentos || []), dept];
+    }
+    setUsuarios(updatedUsers);
+  };
+
   const addMetaGlobal = () => {
     if (!newMetaNome.trim() || !newMetaDept) return;
     const metas = localSettings.metas_globais || [];
     setLocalSettings({
       ...localSettings,
-      // Aplica a regra da primeira letra maiúscula e o resto como o usuário digitou
       metas_globais: [...metas, { id: generateId(), nome: capitalizeFirstLetter(newMetaNome.trim()), departamento: newMetaDept }]
     });
     setNewMetaNome('');
@@ -155,7 +177,6 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
     setLocalSettings({ ...localSettings, metas_globais: metas, empresas_base: empresas });
   };
 
-  // === LÓGICA: EMPRESAS BASE E MODAL ÚNICA ===
   const openEmpresaModal = (emp?: EmpresaBase) => {
     if (emp) {
       setEmpresaId(emp.id);
@@ -211,12 +232,10 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
     if (window.confirm('Excluir esta Empresa Base?')) {
       const currentEmpresas = (localSettings.empresas_base || []).filter(e => e.id !== id);
       setLocalSettings({ ...localSettings, empresas_base: currentEmpresas });
-      // Limpa a seleção se a empresa excluída estivesse selecionada
       setSelectedEmpresasIds(selectedEmpresasIds.filter(selectedId => selectedId !== id));
     }
   };
 
-  // === LÓGICA: EDIÇÃO EM LOTE (BULK) ===
   const safeDepartamentos = localSettings.departamentos || [];
   const safeMetasGlobais = localSettings.metas_globais || [];
   const safeTributacoes = localSettings.tributacoes || [];
@@ -228,27 +247,19 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
   });
 
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.checked) {
-      setSelectedEmpresasIds(filteredEmpresas.map(emp => emp.id));
-    } else {
-      setSelectedEmpresasIds([]);
-    }
+    if (e.target.checked) setSelectedEmpresasIds(filteredEmpresas.map(emp => emp.id));
+    else setSelectedEmpresasIds([]);
   };
 
   const handleSelectOne = (id: string) => {
-    if (selectedEmpresasIds.includes(id)) {
-      setSelectedEmpresasIds(selectedEmpresasIds.filter(itemId => itemId !== id));
-    } else {
-      setSelectedEmpresasIds([...selectedEmpresasIds, id]);
-    }
+    if (selectedEmpresasIds.includes(id)) setSelectedEmpresasIds(selectedEmpresasIds.filter(itemId => itemId !== id));
+    else setSelectedEmpresasIds([...selectedEmpresasIds, id]);
   };
 
   const applyBulkTributacao = () => {
     if (!bulkTrib) return;
     const updated = (localSettings.empresas_base || []).map(emp => {
-      if (selectedEmpresasIds.includes(emp.id)) {
-        return { ...emp, tributacao: bulkTrib };
-      }
+      if (selectedEmpresasIds.includes(emp.id)) return { ...emp, tributacao: bulkTrib };
       return emp;
     });
     setLocalSettings({ ...localSettings, empresas_base: updated });
@@ -262,7 +273,6 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
     const updated = (localSettings.empresas_base || []).map(emp => {
       if (selectedEmpresasIds.includes(emp.id)) {
         const metas = emp.metas_vinculadas || [];
-        // Só adiciona se a empresa ainda não tiver essa meta
         if (!metas.some(m => m.metaId === bulkMetaId)) {
           return { ...emp, metas_vinculadas: [...metas, { metaId: bulkMetaId, tempo_estimado: Number(bulkMetaTime) }] };
         }
@@ -309,7 +319,7 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
       {/* ÁREA DE CONTEÚDO */}
       <div className="flex-1 overflow-auto p-6 md:p-8 bg-white relative">
         
-        {/* ABA: EMPRESAS BASE COM BULK EDIT */}
+        {/* ABA: EMPRESAS BASE */}
         {activeTab === 'empresas' && (
           <div className="max-w-5xl animate-fade-in flex flex-col h-full">
             <div className="flex justify-between items-start mb-6">
@@ -333,7 +343,6 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
               </select>
             </div>
 
-            {/* BARRA DE AÇÕES EM LOTE */}
             {selectedEmpresasIds.length > 0 && (
               <div className="bg-[#f0f4ff] border border-[#bfdbfe] p-3 rounded-xl mb-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 animate-fade-in shadow-sm">
                 <span className="text-sm font-black text-[#1e3a8a] flex items-center gap-2">
@@ -356,12 +365,7 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
                   <thead className="bg-slate-50 text-slate-600 font-bold sticky top-0 border-b border-slate-200 z-10">
                     <tr>
                       <th className="px-4 py-3 w-12 text-center">
-                        <input 
-                          type="checkbox" 
-                          onChange={handleSelectAll} 
-                          checked={filteredEmpresas.length > 0 && selectedEmpresasIds.length === filteredEmpresas.length} 
-                          className="w-4 h-4 text-[#2563eb] rounded border-slate-300 cursor-pointer"
-                        />
+                        <input type="checkbox" onChange={handleSelectAll} checked={filteredEmpresas.length > 0 && selectedEmpresasIds.length === filteredEmpresas.length} className="w-4 h-4 text-[#2563eb] rounded border-slate-300 cursor-pointer" />
                       </th>
                       <th className="px-4 py-3">Empresa</th>
                       <th className="px-4 py-3 text-center">Tributação</th>
@@ -373,12 +377,7 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
                     {filteredEmpresas.map(emp => (
                       <tr key={emp.id} className={`hover:bg-slate-50 group transition-colors ${selectedEmpresasIds.includes(emp.id) ? 'bg-[#f0f4ff]/40' : ''}`}>
                         <td className="px-4 py-3 text-center">
-                          <input 
-                            type="checkbox" 
-                            checked={selectedEmpresasIds.includes(emp.id)} 
-                            onChange={() => handleSelectOne(emp.id)} 
-                            className="w-4 h-4 text-[#2563eb] rounded border-slate-300 cursor-pointer"
-                          />
+                          <input type="checkbox" checked={selectedEmpresasIds.includes(emp.id)} onChange={() => handleSelectOne(emp.id)} className="w-4 h-4 text-[#2563eb] rounded border-slate-300 cursor-pointer" />
                         </td>
                         <td className="px-4 py-3 font-bold text-slate-800">{emp.nome}</td>
                         <td className="px-4 py-3 text-center">
@@ -415,7 +414,6 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
             
             <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 mb-8 shadow-inner">
               <div className="flex flex-col md:flex-row gap-3">
-                {/* CAMPO DE TEXTO SEM BLOQUEIO UPPERCASE FORÇADO */}
                 <input 
                   type="text" 
                   value={newMetaNome} 
@@ -458,7 +456,7 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
           </div>
         )}
 
-        {/* ABA: COLABORADORES */}
+        {/* ABA: COLABORADORES COM CHECKBOX DE ESTAGIÁRIO */}
         {activeTab === 'colaboradores' && (
           <div className="max-w-4xl animate-fade-in">
             <div className="mb-6">
@@ -472,7 +470,7 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
                   {editingUserIndex !== null ? 'Editando Colaborador' : 'Novo Colaborador'}
                 </h4>
                 {editingUserIndex !== null && (
-                  <button onClick={() => {setEditingUserIndex(null); setNewUserNome(''); setNewUserEmail(''); setNewUserDepts([]);}} className="text-slate-400 hover:text-slate-700 text-xs font-bold underline">Cancelar Edição</button>
+                  <button onClick={() => {setEditingUserIndex(null); setNewUserNome(''); setNewUserEmail(''); setNewUserDepts([]); setNewUserIsEstagiario(false);}} className="text-slate-400 hover:text-slate-700 text-xs font-bold underline">Cancelar Edição</button>
                 )}
               </div>
               
@@ -480,6 +478,11 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
                 <div className="flex-1 w-full space-y-3">
                   <input type="text" value={newUserNome} onChange={(e) => setNewUserNome(e.target.value)} placeholder="Nome (Ex: CAMILA)" className="w-full px-4 py-2 bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-[#2563eb] uppercase font-bold text-sm" />
                   <input type="email" value={newUserEmail} onChange={(e) => setNewUserEmail(e.target.value)} placeholder="E-mail de acesso (@vsmweb.com.br)" className="w-full px-4 py-2 bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-[#2563eb] text-sm" />
+                  {/* NOVO: CHECKBOX DE ESTAGIÁRIO */}
+                  <label className="flex items-center gap-2 cursor-pointer mt-2 pl-1">
+                    <input type="checkbox" checked={newUserIsEstagiario} onChange={(e) => setNewUserIsEstagiario(e.target.checked)} className="w-4 h-4 text-[#2563eb] rounded border-slate-300 focus:ring-[#2563eb]" />
+                    <span className="text-sm font-bold text-slate-600">É Estagiário (Calcula meia diária na produtividade)</span>
+                  </label>
                 </div>
                 
                 <div className="w-full md:w-auto bg-white border border-slate-200 p-3 rounded-lg flex-1">
@@ -508,7 +511,11 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
               {usuarios.map((user, index) => (
                 <div key={index} className={`border rounded-xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 group shadow-sm hover:border-[#2563eb] transition-all ${editingUserIndex === index ? 'border-[#2563eb] bg-[#f0f4ff]/50' : 'bg-white border-slate-200'}`}>
                   <div>
-                    <h4 className="font-black text-slate-800 text-lg uppercase">{user.nome}</h4>
+                    <h4 className="font-black text-slate-800 text-lg uppercase flex items-center gap-2">
+                      {user.nome}
+                      {/* BADGE DE ESTAGIÁRIO */}
+                      {user.isEstagiario && <span className="bg-amber-100 text-amber-700 text-[10px] px-2 py-0.5 rounded font-bold tracking-wider">ESTAGIÁRIO</span>}
+                    </h4>
                     <span className="text-sm text-slate-500 font-medium">{user.email}</span>
                   </div>
                   <div className="flex-1 flex flex-wrap justify-end gap-2">
@@ -550,20 +557,15 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
       </div>
 
       {/* MODAIS (CRIAR EMPRESA E AÇÕES EM LOTE) */}
-      
-      {/* 1. Modal Ações em Lote */}
       {showBulkModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[110] p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-fade-in">
             <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-[#f0f4ff]">
-              <h2 className="text-lg font-black text-[#1e3a8a]">
-                {showBulkModal === 'tributacao' ? 'Alterar Tributação em Lote' : 'Vincular Meta em Lote'}
-              </h2>
+              <h2 className="text-lg font-black text-[#1e3a8a]">{showBulkModal === 'tributacao' ? 'Alterar Tributação em Lote' : 'Vincular Meta em Lote'}</h2>
               <button onClick={() => setShowBulkModal(null)} className="text-slate-400 hover:text-red-500"><X size={20}/></button>
             </div>
             <div className="p-5">
               <p className="text-sm text-slate-600 mb-4">Você selecionou <b>{selectedEmpresasIds.length} empresas</b> para esta ação.</p>
-              
               {showBulkModal === 'tributacao' && (
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nova Tributação</label>
@@ -573,7 +575,6 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
                   </select>
                 </div>
               )}
-
               {showBulkModal === 'meta' && (
                 <div className="space-y-4">
                   <div>
@@ -592,15 +593,12 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
             </div>
             <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
               <button onClick={() => setShowBulkModal(null)} className="px-5 py-2 text-slate-600 font-bold hover:bg-slate-200 rounded-xl transition-colors">Cancelar</button>
-              <button onClick={showBulkModal === 'tributacao' ? applyBulkTributacao : applyBulkMeta} disabled={showBulkModal === 'tributacao' ? !bulkTrib : (!bulkMetaId || bulkMetaTime === '')} className="px-6 py-2 bg-[#2563eb] hover:bg-[#1e3a8a] text-white font-bold rounded-xl transition-colors shadow-sm disabled:opacity-50">
-                Aplicar a Todas
-              </button>
+              <button onClick={showBulkModal === 'tributacao' ? applyBulkTributacao : applyBulkMeta} disabled={showBulkModal === 'tributacao' ? !bulkTrib : (!bulkMetaId || bulkMetaTime === '')} className="px-6 py-2 bg-[#2563eb] hover:bg-[#1e3a8a] text-white font-bold rounded-xl transition-colors shadow-sm disabled:opacity-50">Aplicar a Todas</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* 2. Modal Editar/Nova Empresa Individual */}
       {isEmpresaModalOpen && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden animate-fade-in">
@@ -611,7 +609,6 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
               </div>
               <button onClick={() => setIsEmpresaModalOpen(false)} className="text-slate-400 hover:text-red-500 bg-white p-2 rounded-full border border-slate-200"><X size={20}/></button>
             </div>
-            
             <div className="p-6 flex-1 overflow-y-auto space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -626,14 +623,11 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
                   </select>
                 </div>
               </div>
-
               <hr className="border-slate-100"/>
-
               <div>
                 <h4 className="text-sm font-black text-[#1e3a8a] uppercase tracking-wider flex items-center gap-2 mb-3">
                   <Target size={16}/> Metas Vinculadas ({empresaMetas.length})
                 </h4>
-                
                 <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col md:flex-row gap-3 mb-4 items-end">
                   <div className="flex-1 w-full">
                     <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Selecione a Meta</label>
@@ -646,11 +640,8 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
                     <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Tempo Est. (Dias)</label>
                     <input type="number" step="0.5" min="0" value={selectedMetaTimeToLink} onChange={(e) => setSelectedMetaTimeToLink(Number(e.target.value))} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-center font-bold focus:border-[#2563eb]" placeholder="Ex: 1.5"/>
                   </div>
-                  <button onClick={linkMetaToEmpresa} disabled={!selectedMetaIdToLink || selectedMetaTimeToLink === ''} className="w-full md:w-auto px-4 py-2 bg-[#2563eb] hover:bg-[#1e3a8a] text-white rounded-lg font-bold disabled:opacity-50 transition-colors">
-                    Vincular
-                  </button>
+                  <button onClick={linkMetaToEmpresa} disabled={!selectedMetaIdToLink || selectedMetaTimeToLink === ''} className="w-full md:w-auto px-4 py-2 bg-[#2563eb] hover:bg-[#1e3a8a] text-white rounded-lg font-bold disabled:opacity-50 transition-colors">Vincular</button>
                 </div>
-
                 <div className="border border-slate-200 rounded-xl overflow-hidden">
                   <table className="w-full text-left text-sm">
                     <thead className="bg-slate-100 text-slate-500 text-[10px] uppercase tracking-wider">
@@ -664,9 +655,7 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
                             <td className="px-4 py-2 font-bold text-slate-800">{metaOriginal?.nome || 'Meta Excluída'}</td>
                             <td className="px-4 py-2 text-center"><span className="text-[10px] bg-slate-100 px-2 py-0.5 rounded font-bold uppercase">{metaOriginal?.departamento || '-'}</span></td>
                             <td className="px-4 py-2 text-center font-black text-[#2563eb]">{metaV.tempo_estimado}d</td>
-                            <td className="px-4 py-2 text-right">
-                              <button onClick={() => unlinkMetaFromEmpresa(metaV.metaId)} className="text-slate-300 hover:text-red-500 p-1 rounded hover:bg-red-50 transition-colors"><Trash2 size={16}/></button>
-                            </td>
+                            <td className="px-4 py-2 text-right"><button onClick={() => unlinkMetaFromEmpresa(metaV.metaId)} className="text-slate-300 hover:text-red-500 p-1 rounded hover:bg-red-50 transition-colors"><Trash2 size={16}/></button></td>
                           </tr>
                         );
                       })}
@@ -676,7 +665,6 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
                 </div>
               </div>
             </div>
-
             <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
               <button onClick={() => setIsEmpresaModalOpen(false)} className="px-5 py-2 text-slate-600 font-bold hover:bg-slate-200 rounded-xl transition-colors">Cancelar</button>
               <button onClick={saveEmpresa} disabled={!empresaNome} className="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition-colors shadow-sm">Confirmar e Fechar</button>
