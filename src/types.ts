@@ -40,24 +40,31 @@ export interface PdiEntry {
 }
 
 export interface UsuarioConfig {
-  id?: string; // Adicionado ID para facilitar edição
+  id?: string; 
   nome: string;
   email: string;
   departamentos?: string[]; 
 }
 
-// NOVO: Estrutura da Empresa Base
+// NOVO: Estrutura da Meta Global
+export interface MetaGlobal {
+  id: string;
+  nome: string;
+  departamento: string; 
+}
+
+// NOVO: O Vínculo da Meta com o Tempo dentro da Empresa
+export interface MetaVinculada {
+  metaId: string;
+  tempo_estimado: number;
+}
+
+// NOVO: A Empresa agora guarda suas metas!
 export interface EmpresaBase {
   id: string;
   nome: string;
   tributacao: string;
-}
-
-// NOVO: Estrutura das Metas
-export interface MetaGlobal {
-  id: string;
-  nome: string;
-  departamento: string; // Para filtrar: meta de Folha só aparece no Pessoal
+  metas_vinculadas?: MetaVinculada[];
 }
 
 export interface AppSettings {
@@ -65,11 +72,11 @@ export interface AppSettings {
   atividades: string[];
   prioridades: string[];
   tributacoes: string[];
-  empresas: string[]; // Antigo (manteremos por enquanto para não quebrar)
+  empresas: string[]; 
   usuarios?: string | UsuarioConfig[]; 
   departamentos?: string[]; 
-  empresas_base?: EmpresaBase[]; // NOVO
-  metas_globais?: MetaGlobal[]; // NOVO
+  empresas_base?: EmpresaBase[]; 
+  metas_globais?: MetaGlobal[]; 
 }
 
 export const MONTHS = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
