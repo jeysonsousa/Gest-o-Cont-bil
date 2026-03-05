@@ -27,6 +27,9 @@ import {
   Settings 
 } from 'lucide-react';
 
+// LISTA DE ADMINISTRADORES DO SISTEMA (Fallback)
+const ADMIN_EMAILS = ['jeyson@vsmweb.com.br', 'cristiane.cardoso@vsmweb.com.br'];
+
 export default function App() {
   const [session, setSession] = useState<any>(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -39,8 +42,6 @@ export default function App() {
   const [isTvMode, setIsTvMode] = useState(false);
   const [tvInterval, setTvInterval] = useState<number>(5); 
   const [showTvSettings, setShowTvSettings] = useState(false);
-  
-  // ESTADO DE ADMIN DINÂMICO
   const [isAdminState, setIsAdminState] = useState(false);
 
   useEffect(() => {
@@ -65,7 +66,10 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!session) return;
+    if (!session) {
+      setSettingsLoaded(false);
+      return;
+    }
     
     async function loadAccess() {
       const { data } = await supabase.from('settings').select('*').eq('id', 1).single();
@@ -74,7 +78,7 @@ export default function App() {
         const globalDepts = data.departamentos || ['Contábil', 'Fiscal', 'Pessoal'];
         const email = session.user.email.toLowerCase().trim();
         
-        let isUserAdmin = email === 'jeyson@vsmweb.com.br'; // Segurança Master
+        let isUserAdmin = ADMIN_EMAILS.includes(email); // Segurança Master + Lista Hardcoded
         
         let users: UsuarioConfig[] = [];
         if (typeof data.usuarios === 'string') {
@@ -111,8 +115,15 @@ export default function App() {
     await supabase.auth.signOut();
   };
 
-  if (authLoading || !settingsLoaded) return <div className="min-h-screen bg-slate-50 flex items-center justify-center font-bold text-[#2563eb]">Carregando sistema...</div>;
+  // === A CORREÇÃO ESTÁ AQUI NESTA ORDEM EXATA ===
+  // 1. Verifica se a autenticação do Firebase/Supabase terminou
+  if (authLoading) return <div className="min-h-screen bg-slate-50 flex items-center justify-center font-bold text-[#2563eb]">Autenticando...</div>;
+  
+  // 2. SE NÃO ESTIVER LOGADO, MOSTRA O LOGIN IMEDIATAMENTE (O bug estava aqui)
   if (!session) return <Login />;
+  
+  // 3. Só tenta mostrar a tela de "Carregando acessos" se a pessoa JÁ ESTIVER LOGADA
+  if (!settingsLoaded) return <div className="min-h-screen bg-slate-50 flex items-center justify-center font-bold text-[#2563eb]">Carregando acessos do sistema...</div>;
 
   const userEmail = session.user.email?.toLowerCase().trim() || '';
 
