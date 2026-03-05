@@ -51,7 +51,6 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
   const [showPending, setShowPending] = useState(true);
   const [showCompleted, setShowCompleted] = useState(false);
 
-  // ESTADOS DOS MODAIS EXPANSÍVEIS
   const [showHojeModal, setShowHojeModal] = useState(false);
   const [showAtrasadasModal, setShowAtrasadasModal] = useState(false);
 
@@ -110,7 +109,6 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
         return;
       }
       setLoading(true);
-      // REMOVIDO o setSearchTerm('') daqui para não apagar a sua pesquisa ao voltar para a aba!
 
       try {
         const { data: clientsData } = await supabase.from('clients')
@@ -132,10 +130,26 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
         const activeClientNames = activeClients.map((c: Client) => c.empresa.toUpperCase().trim());
 
         const validDbEntries = dbEntries.filter(e => e.is_extra || activeClientNames.includes(e.empresa.toUpperCase().trim()));
-        const combined: PdiEntry[] = [...validDbEntries];
-        setBaseClients(activeClients); 
-
         const deptMetasGlobais = (settings.metas_globais || []).filter(m => m.departamento.toUpperCase().trim() === currentDepartment.toUpperCase().trim());
+
+        // ENRIQUECE OS DADOS DO BANCO COM O TEMPO ESTIMADO ATUAL PARA EXIBIR NO TOOLTIP
+        const enrichedDbEntries = validDbEntries.map(e => {
+          if (e.is_extra) return e;
+          const empBase = (settings.empresas_base || []).find(emp => emp.nome.toUpperCase().trim() === e.empresa.toUpperCase().trim());
+          if (empBase && empBase.metas_vinculadas) {
+            const metaDef = deptMetasGlobais.find(m => m.nome.toUpperCase().trim() === e.atividade.toUpperCase().trim());
+            if (metaDef) {
+              const linkedMeta = empBase.metas_vinculadas.find(mv => mv.metaId === metaDef.id);
+              if (linkedMeta) {
+                return { ...e, tempo_estimado: linkedMeta.tempo_estimado };
+              }
+            }
+          }
+          return e;
+        });
+
+        const combined: PdiEntry[] = [...enrichedDbEntries];
+        setBaseClients(activeClients); 
 
         activeClients.forEach((client: Client) => {
           const empBase = (settings.empresas_base || []).find(e => e.nome.toUpperCase().trim() === client.empresa.toUpperCase().trim());
@@ -146,7 +160,7 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
             linkedDeptMetas.forEach(mv => {
               const metaDef = deptMetasGlobais.find(dmg => dmg.id === mv.metaId);
               if (metaDef) {
-                const exists = validDbEntries.find(e => 
+                const exists = combined.find(e => 
                   e.empresa.toUpperCase().trim() === client.empresa.toUpperCase().trim() && 
                   e.atividade.toUpperCase().trim() === metaDef.nome.toUpperCase().trim() && 
                   !e.is_extra
@@ -157,7 +171,8 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
                     responsavel: activeResponsavel, empresa: client.empresa, atividade: metaDef.nome,
                     competencia: `${activeMonth}/${activeYear}`, inicio: '', termino: '', prazo_realizado: '',
                     meio_expediente: false, percentual: 0, status: 'n', observacao: '',
-                    mes: activeMonth, ano: activeYear, is_extra: false, departamento: currentDepartment
+                    mes: activeMonth, ano: activeYear, is_extra: false, departamento: currentDepartment,
+                    tempo_estimado: mv.tempo_estimado // Adiciona o tempo para as metas geradas automaticamente
                   });
                 }
               }
@@ -188,7 +203,6 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
     return { avg, total, completed };
   }, [localData]);
 
-  // CÁLCULO E EXTRAÇÃO DAS TAREFAS DO DIA PARA OS MODAIS
   const { tarefasHojeList, tarefasAtrasadasList } = useMemo(() => {
     const todayDate = new Date();
     const offset = todayDate.getTimezoneOffset();
@@ -274,11 +288,14 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
     setSaving(true);
     try {
       for (const row of localData) {
-        const dbRow = {
+        const dbRow: any = {
           ...row, inicio: row.inicio || null, termino: row.termino || null,
           prazo_realizado: row.prazo_realizado || null, meio_expediente: row.meio_expediente || false,
           departamento: currentDepartment 
         };
+        
+        // Remove a propriedade virtual para não dar erro no Supabase
+        delete dbRow.tempo_estimado;
 
         if (row.id) {
           await supabase.from('pdi_entries').update(dbRow).eq('id', row.id);
@@ -329,7 +346,20 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
     return (
       <tr key={index} className={row.is_extra ? 'bg-slate-50/50' : 'hover:bg-slate-50'}>
         <td className="p-1 border-r border-slate-200"><input type="text" value={row.empresa} onChange={(e) => handleInputChange(index, 'empresa', e.target.value)} disabled={!row.is_extra} className={`w-full p-2 outline-none uppercase font-bold text-xs ${!row.is_extra ? 'bg-transparent text-slate-700' : 'bg-white border border-slate-300 rounded'}`} placeholder="NOME DA EMPRESA" /></td>
-        <td className="p-1 border-r border-slate-200"><input type="text" value={row.atividade} onChange={(e) => handleInputChange(index, 'atividade', e.target.value)} disabled={!row.is_extra} className={`w-full p-2 outline-none bg-transparent text-[#1e3a8a] font-bold text-[11px] ${!row.is_extra && 'cursor-not-allowed'}`} placeholder="Qual a ação?" title={!row.is_extra ? 'Ação vinda do Cadastro Global' : ''} /></td>
+        
+        {/* A MÁGICA DO BALÃOZINHO DE TEMPO ESTIMADO ESTÁ AQUI */}
+        <td className="p-1 border-r border-slate-200">
+          <input 
+            type="text" 
+            value={row.atividade} 
+            onChange={(e) => handleInputChange(index, 'atividade', e.target.value)} 
+            disabled={!row.is_extra} 
+            className={`w-full p-2 outline-none bg-transparent text-[#1e3a8a] font-bold text-[11px] ${!row.is_extra && 'cursor-not-allowed'}`} 
+            placeholder="Qual a ação?" 
+            title={!row.is_extra && row.tempo_estimado !== undefined ? `Tempo estimado pela gestão: ${row.tempo_estimado} dia(s)` : (!row.is_extra ? 'Ação vinda do Cadastro Global' : '')} 
+          />
+        </td>
+        
         <td className="p-1 border-r border-slate-200 text-center"><input type="text" value={row.competencia} onChange={(e) => handleInputChange(index, 'competencia', e.target.value)} className="w-full p-2 outline-none bg-transparent text-slate-500 text-[11px] font-bold text-center" /></td>
         <td className="p-1 border-r border-slate-200"><input type="date" value={row.inicio || ''} onChange={(e) => handleInputChange(index, 'inicio', e.target.value)} className="w-full p-1.5 outline-none bg-white border border-slate-200 rounded text-xs font-medium text-slate-600 focus:border-[#2563eb]" /></td>
         <td className="p-1 border-r border-slate-200"><input type="date" value={row.termino || ''} onChange={(e) => handleInputChange(index, 'termino', e.target.value)} className="w-full p-1.5 outline-none bg-white border border-slate-200 rounded text-xs font-medium text-slate-600 focus:border-[#2563eb]" /></td>
@@ -358,7 +388,6 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
   return (
     <div className="p-4 md:p-6 max-w-[1600px] mx-auto space-y-4 md:space-y-6">
       
-      {/* CABEÇALHO */}
       <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
@@ -396,8 +425,6 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
       ) : (
         <>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            
-            {/* 1. Desempenho (Evolução) */}
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col justify-between">
               <div className="flex justify-between items-start mb-2">
                  <div>
@@ -413,7 +440,6 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
               </div>
             </div>
 
-            {/* 2. Resumo de Entregas */}
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col justify-between">
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Volume de Entregas</p>
               <div className="flex items-baseline gap-2 mb-1">
@@ -423,7 +449,6 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
               <p className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded inline-block w-fit">Metas Validadas</p>
             </div>
 
-            {/* 3. Tarefas Hoje (AGORA É CLICÁVEL) */}
             <div onClick={() => setShowHojeModal(true)} className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col justify-between relative overflow-hidden group cursor-pointer hover:shadow-md transition-all hover:-translate-y-0.5">
               <div className="absolute right-0 top-0 bottom-0 w-1 bg-amber-400 transition-all group-hover:w-2"></div>
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-1 group-hover:text-amber-500 transition-colors">
@@ -433,7 +458,6 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
               <p className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded inline-block w-fit">Ver Lista</p>
             </div>
 
-            {/* 4. Atrasadas (AGORA É CLICÁVEL) */}
             <div onClick={() => setShowAtrasadasModal(true)} className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col justify-between relative overflow-hidden group cursor-pointer hover:shadow-md transition-all hover:-translate-y-0.5">
               <div className="absolute right-0 top-0 bottom-0 w-1 bg-red-500 transition-all group-hover:w-2"></div>
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-1 group-hover:text-red-500 transition-colors">
@@ -442,7 +466,6 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
               <h3 className="text-3xl font-black text-red-500 mb-1">{tarefasAtrasadasList.length}</h3>
               <p className="text-[10px] font-bold text-red-700 bg-red-50 px-2 py-0.5 rounded inline-block w-fit">Ver Lista</p>
             </div>
-            
           </div>
 
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
@@ -535,7 +558,6 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
         </>
       )}
 
-      {/* MODAL TAREFAS DE HOJE */}
       {showHojeModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col animate-fade-in">
@@ -568,7 +590,6 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
         </div>
       )}
 
-      {/* MODAL TAREFAS ATRASADAS */}
       {showAtrasadasModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col animate-fade-in">
