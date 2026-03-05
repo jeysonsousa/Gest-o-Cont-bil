@@ -37,6 +37,7 @@ export interface PdiEntry {
   ano: string;
   is_extra?: boolean;
   departamento?: string; 
+  tempo_estimado?: number; // NOVO: Para exibir no balãozinho (Tooltip)
 }
 
 export interface UsuarioConfig {
@@ -59,7 +60,6 @@ export interface MetaVinculada {
   tempo_estimado: number;
 }
 
-// NOVO: Estrutura da Matriz de Departamentos
 export interface DeptAlocacao {
   responsavel: string;
   prioridade: string;
@@ -70,10 +70,10 @@ export interface EmpresaBase {
   id: string;
   nome: string;
   tributacao: string;
-  atividade?: string; // NOVO: Transferido do painel para o Global
+  atividade?: string; 
   metas_vinculadas?: MetaVinculada[];
   is_inactive?: boolean; 
-  alocacoes?: Record<string, DeptAlocacao>; // NOVO: Matriz de controle
+  alocacoes?: Record<string, DeptAlocacao>; 
 }
 
 export interface AppSettings {
