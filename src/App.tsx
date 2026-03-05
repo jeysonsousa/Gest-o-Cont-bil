@@ -27,9 +27,6 @@ import {
   Settings 
 } from 'lucide-react';
 
-// LISTA DE ADMINISTRADORES DO SISTEMA
-const ADMIN_EMAILS = ['jeyson@vsmweb.com.br', 'cristiane.cardoso@vsmweb.com.br'];
-
 export default function App() {
   const [session, setSession] = useState<any>(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -42,6 +39,9 @@ export default function App() {
   const [isTvMode, setIsTvMode] = useState(false);
   const [tvInterval, setTvInterval] = useState<number>(5); 
   const [showTvSettings, setShowTvSettings] = useState(false);
+  
+  // ESTADO DE ADMIN DINÂMICO
+  const [isAdminState, setIsAdminState] = useState(false);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -73,20 +73,27 @@ export default function App() {
         setGlobalSettings(data);
         const globalDepts = data.departamentos || ['Contábil', 'Fiscal', 'Pessoal'];
         const email = session.user.email.toLowerCase().trim();
-        const isAdmin = ADMIN_EMAILS.includes(email);
+        
+        let isUserAdmin = email === 'jeyson@vsmweb.com.br'; // Segurança Master
+        
+        let users: UsuarioConfig[] = [];
+        if (typeof data.usuarios === 'string') {
+          try { users = JSON.parse(data.usuarios); } catch (e) {}
+        } else if (Array.isArray(data.usuarios)) {
+          users = data.usuarios;
+        }
+        
+        const myConfig = users.find(u => u.email === email);
+        if (myConfig && myConfig.isAdmin) {
+          isUserAdmin = true;
+        }
 
-        if (isAdmin) {
+        setIsAdminState(isUserAdmin);
+
+        if (isUserAdmin) {
           setAllowedDepts(globalDepts);
           setCurrentDepartment(globalDepts[0] || '');
         } else {
-          let users: UsuarioConfig[] = [];
-          if (typeof data.usuarios === 'string') {
-            try { users = JSON.parse(data.usuarios); } catch (e) {}
-          } else if (Array.isArray(data.usuarios)) {
-            users = data.usuarios;
-          }
-          
-          const myConfig = users.find(u => u.email === email);
           if (myConfig && myConfig.departamentos && myConfig.departamentos.length > 0) {
             setAllowedDepts(myConfig.departamentos);
             setCurrentDepartment(myConfig.departamentos[0]);
@@ -108,9 +115,8 @@ export default function App() {
   if (!session) return <Login />;
 
   const userEmail = session.user.email?.toLowerCase().trim() || '';
-  const isAdmin = ADMIN_EMAILS.includes(userEmail);
 
-  if (allowedDepts.length === 0 && !isAdmin) {
+  if (allowedDepts.length === 0 && !isAdminState) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
         <div className="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full text-center border border-red-100">
@@ -177,7 +183,7 @@ export default function App() {
             {!isSidebarCollapsed && <span className="text-sm whitespace-nowrap">Produtividade</span>}
           </button>
 
-          {isAdmin && (
+          {isAdminState && (
             <>
               <div className="my-4 border-t border-slate-200"></div>
               <button onClick={() => setCurrentRoute('settings')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${currentRoute === 'settings' ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'} ${isSidebarCollapsed ? 'justify-center px-0' : ''}`}>
@@ -219,7 +225,7 @@ export default function App() {
             {!isSidebarCollapsed && (
               <>
                 <span className="text-xs font-bold text-slate-700 truncate w-full text-center mt-2" title={userEmail}>{userEmail}</span>
-                {isAdmin ? <span className="text-[9px] bg-[#dbeafe] text-[#1e3a8a] px-2 py-0.5 rounded-md font-bold uppercase tracking-widest mt-2 border border-[#bfdbfe]">Admin do Sistema</span> : <span className="text-[9px] bg-slate-200 text-slate-600 px-2 py-0.5 rounded-md font-bold uppercase tracking-widest mt-2">Analista</span>}
+                {isAdminState ? <span className="text-[9px] bg-[#dbeafe] text-[#1e3a8a] px-2 py-0.5 rounded-md font-bold uppercase tracking-widest mt-2 border border-[#bfdbfe]">Admin do Sistema</span> : <span className="text-[9px] bg-slate-200 text-slate-600 px-2 py-0.5 rounded-md font-bold uppercase tracking-widest mt-2">Analista</span>}
                 <button onClick={handleLogout} className="mt-3 flex items-center justify-center gap-2 w-full px-3 py-2 text-xs font-bold text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-transparent hover:border-red-100"><LogOut size={14} /> Sair</button>
               </>
             )}
@@ -258,7 +264,7 @@ export default function App() {
             />
           </div>
         ) : currentRoute === 'dashboard' ? (
-          <Dashboard isAdmin={isAdmin} currentDepartment={currentDepartment} />
+          <Dashboard isAdmin={isAdminState} currentDepartment={currentDepartment} />
         ) : currentRoute === 'pdi' ? (
           <Pdi currentDepartment={currentDepartment} />
         ) : (
