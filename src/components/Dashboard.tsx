@@ -6,7 +6,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Client, MONTHS, Status, AppSettings, StatusRecord, UsuarioConfig, EmpresaBase } from '../types';
 import { StatusIndicator } from './StatusIndicator';
-import { Search, Plus, ArrowUpDown, Edit2, Trash2, X, UserCheck, EyeOff, Download } from 'lucide-react';
+import { Search, ArrowUpDown, UserCheck, EyeOff, Download, ShieldCheck } from 'lucide-react';
 import { supabase } from '../supabase';
 
 const currentYearNum = new Date().getFullYear();
@@ -41,11 +41,6 @@ export function Dashboard({ isAdmin, currentDepartment }: DashboardProps) {
   const [filterTributacao, setFilterTributacao] = useState('');
   const [sortConfig, setSortConfig] = useState<{ key: keyof Client, direction: 'asc' | 'desc' } | null>(null);
 
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingClient, setEditingClient] = useState<Client | null>(null);
-  const [formData, setFormData] = useState<Partial<Client>>({});
-  const [selectedEmpresaBaseId, setSelectedEmpresaBaseId] = useState('');
-  
   const [activeMonth, setActiveMonth] = useState<string>(MONTHS[defaultMonthIndex]);
   const [activeYear, setActiveYear] = useState<string>(defaultYearNum.toString());
 
@@ -72,31 +67,10 @@ export function Dashboard({ isAdmin, currentDepartment }: DashboardProps) {
     fetchData();
   }, [currentDepartment]);
 
-  const responsaveisDoDepartamento = useMemo(() => {
-    let users: UsuarioConfig[] = [];
-    if (typeof settings.usuarios === 'string') {
-      try { users = JSON.parse(settings.usuarios); } catch (e) {}
-    } else if (Array.isArray(settings.usuarios)) {
-      users = settings.usuarios;
-    }
-    let deptUsers = users.filter(u => u.departamentos && u.departamentos.includes(currentDepartment));
-    if (deptUsers.length === 0) deptUsers = users; 
-    return [...new Set(deptUsers.map(u => u.nome))].sort();
-  }, [settings.usuarios, currentDepartment]);
-
   const activeAnalysts = useMemo(() => {
     const list = clients.filter(c => !c.is_inactive).map(c => c.responsavel);
     return [...new Set(list)].sort();
   }, [clients]);
-
-  // FILTRA PARA MOSTRAR APENAS EMPRESAS ATIVAS NO DROPDOWN
-  const empresasDisponiveis = useMemo(() => {
-    const alocadas = clients.map(c => c.empresa);
-    return (settings.empresas_base || []).filter(e => 
-      (!e.is_inactive) && 
-      (!alocadas.includes(e.nome) || (editingClient && editingClient.empresa === e.nome))
-    ).sort((a, b) => a.nome.localeCompare(b.nome));
-  }, [settings.empresas_base, clients, editingClient]);
 
   const getStatusInfo = (client: Client, monthName: string, year: string): StatusRecord => {
     const key = `${monthName}-${year}`;
@@ -163,9 +137,28 @@ export function Dashboard({ isAdmin, currentDepartment }: DashboardProps) {
     await supabase.from('clients').update({ status: newStatusObj }).eq('id', clientId);
   };
 
+  // OPÇÃO B: Sincronização dupla do Sem Movimento
   const handleToggleSemMovimento = async (clientId: string, newValue: boolean) => {
+    const client = clients.find(c => c.id === clientId);
+    if (!client) return;
+
     setClients(clients.map(c => c.id === clientId ? { ...c, sem_movimento: newValue } : c));
     await supabase.from('clients').update({ sem_movimento: newValue }).eq('id', clientId);
+
+    // Atualiza silenciosamente na Matriz Global para manter a sincronia perfeita
+    const { data: settingsData } = await supabase.from('settings').select('*').eq('id', 1).single();
+    if (settingsData && settingsData.empresas_base) {
+      const updatedEmpresas = settingsData.empresas_base.map((emp: EmpresaBase) => {
+        if (emp.nome === client.empresa && emp.alocacoes && emp.alocacoes[currentDepartment]) {
+          return {
+            ...emp,
+            alocacoes: { ...emp.alocacoes, [currentDepartment]: { ...emp.alocacoes[currentDepartment], sem_movimento: newValue } }
+          };
+        }
+        return emp;
+      });
+      await supabase.from('settings').update({ empresas_base: updatedEmpresas }).eq('id', 1);
+    }
   };
 
   const handleSort = (key: keyof Client) => {
@@ -220,60 +213,6 @@ export function Dashboard({ isAdmin, currentDepartment }: DashboardProps) {
     document.body.removeChild(link);
   };
 
-  const handleEmpresaBaseChange = (empresaId: string) => {
-    setSelectedEmpresaBaseId(empresaId);
-    const emp = (settings.empresas_base || []).find(e => e.id === empresaId);
-    
-    if (emp) {
-      const deptMetasGlobais = (settings.metas_globais || []).filter(m => m.departamento === currentDepartment);
-      const deptMetaIds = deptMetasGlobais.map(m => m.id);
-
-      let totalTime = 0;
-      (emp.metas_vinculadas || []).forEach(mv => {
-        if (deptMetaIds.includes(mv.metaId)) {
-          totalTime += mv.tempo_estimado;
-        }
-      });
-
-      setFormData({
-        ...formData,
-        empresa: emp.nome,
-        tributacao: emp.tributacao,
-        tempo_estimado: totalTime 
-      });
-    } else {
-      setFormData({ ...formData, empresa: '', tributacao: '', tempo_estimado: 0 });
-    }
-  };
-
-  const handleOpenModal = (client?: Client) => {
-    if (client) {
-      setEditingClient(client);
-      setFormData(client);
-      const empBase = (settings.empresas_base || []).find(e => e.nome === client.empresa);
-      setSelectedEmpresaBaseId(empBase ? empBase.id : '');
-    } else {
-      setEditingClient(null);
-      setSelectedEmpresaBaseId('');
-      setFormData({ responsavel: '', empresa: '', atividade: '', prioridade: 'A', tributacao: '', sem_movimento: false, is_inactive: false, tempo_estimado: 0, status: {}, departamento: currentDepartment });
-    }
-    setIsModalOpen(true);
-  };
-
-  const handleSaveClient = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const payload = { ...formData, departamento: currentDepartment }; 
-    
-    if (editingClient) {
-      const { error } = await supabase.from('clients').update(payload).eq('id', editingClient.id);
-      if (!error) setClients(clients.map(c => c.id === editingClient.id ? { ...c, ...payload } as Client : c));
-    } else {
-      const { data, error } = await supabase.from('clients').insert([payload]).select();
-      if (!error && data) setClients([...clients, data[0] as Client]);
-    }
-    setIsModalOpen(false);
-  }
-
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-slate-50 text-[#2563eb] font-bold">Carregando {currentDepartment}...</div>;
 
   return (
@@ -283,7 +222,10 @@ export function Dashboard({ isAdmin, currentDepartment }: DashboardProps) {
         <div className="shrink-0 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
           <div>
             <h1 className="text-2xl font-bold text-slate-800">Painel de Status: <span className="text-[#2563eb]">{currentDepartment}</span></h1>
-            <p className="text-slate-500 text-sm mt-1">Gestão de clientes e atividades da equipe</p>
+            <p className="text-slate-500 text-sm mt-1 flex items-center gap-1">
+              <ShieldCheck size={14} className="text-emerald-500"/>
+              Gestão automatizada e integrada com o Cadastro Global
+            </p>
           </div>
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
             <div className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200">
@@ -296,15 +238,9 @@ export function Dashboard({ isAdmin, currentDepartment }: DashboardProps) {
                 {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
               </select>
             </div>
-            
-            <div className="flex items-center gap-2">
-              <button onClick={handleExportCSV} className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-lg font-medium transition-colors shadow-sm" title="Exportar dados cadastrais">
-                <Download size={18} /> Exportar
-              </button>
-              <button onClick={() => handleOpenModal()} className="flex items-center gap-2 bg-[#F26522] hover:bg-[#d9551c] text-white px-4 py-2 rounded-lg font-bold transition-colors shadow-sm">
-                <Plus size={18} /> Alocar Empresa
-              </button>
-            </div>
+            <button onClick={handleExportCSV} className="flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-[#1e3a8a] px-4 py-2 rounded-lg font-bold transition-colors shadow-sm" title="Exportar dados cadastrais">
+              <Download size={18} /> Exportar Painel
+            </button>
           </div>
         </div>
 
@@ -372,7 +308,6 @@ export function Dashboard({ isAdmin, currentDepartment }: DashboardProps) {
                       <div style={{ writingMode: 'vertical-rl' }} className="transform rotate-180 text-xs tracking-wider mx-auto">{month.toUpperCase()}</div>
                     </th>
                   ))}
-                  <th className="px-4 py-3 text-right">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -413,105 +348,29 @@ export function Dashboard({ isAdmin, currentDepartment }: DashboardProps) {
                         </td>
                       );
                     })}
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => handleOpenModal(client)} className="p-1.5 text-slate-400 hover:text-[#2563eb] hover:bg-[#f0f4ff] rounded-md transition-colors" title="Editar"><Edit2 size={16} /></button>
-                        <button onClick={async () => { if(window.confirm('Excluir definitivamente este cliente?')) { await supabase.from('clients').delete().eq('id', client.id); setClients(clients.filter(c => c.id !== client.id)); } }} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors" title="Excluir"><Trash2 size={16} /></button>
-                      </div>
-                    </td>
                   </tr>
                 ))}
+                {filteredAndSortedClients.length === 0 && (
+                  <tr><td colSpan={18} className="p-8 text-center text-slate-400 font-medium">O administrador ainda não alocou empresas para este setor.</td></tr>
+                )}
               </tbody>
             </table>
           </div>
         </div>
 
-        <div className="shrink-0 flex items-center gap-6 bg-white p-4 rounded-xl shadow-sm border border-slate-200 text-sm text-slate-600">
-          <span className="font-medium text-slate-800">Legenda Automática:</span>
-          <div className="flex items-center gap-2"><div className="w-4 h-4 rounded-full bg-gray-200"></div><span>Não iniciado</span></div>
-          <div className="flex items-center gap-2"><div className="w-4 h-4 rounded-full bg-amber-400"></div><span>Em Andamento</span></div>
-          <div className="flex items-center gap-2"><div className="w-4 h-4 rounded-full bg-emerald-500"></div><span>Concluído</span></div>
-          <div className="flex items-center gap-2"><div className="w-4 h-4 rounded-full bg-red-500"></div><span>Atrasado (Passou do prazo)</span></div>
+        <div className="shrink-0 flex items-center justify-between bg-white p-4 rounded-xl shadow-sm border border-slate-200 text-sm text-slate-600">
+          <div className="flex items-center gap-6">
+            <span className="font-medium text-slate-800">Legenda Automática:</span>
+            <div className="flex items-center gap-2"><div className="w-4 h-4 rounded-full bg-gray-200"></div><span>Não iniciado</span></div>
+            <div className="flex items-center gap-2"><div className="w-4 h-4 rounded-full bg-amber-400"></div><span>Em Andamento</span></div>
+            <div className="flex items-center gap-2"><div className="w-4 h-4 rounded-full bg-emerald-500"></div><span>Concluído</span></div>
+            <div className="flex items-center gap-2"><div className="w-4 h-4 rounded-full bg-red-500"></div><span>Atrasado (Passou do prazo)</span></div>
+          </div>
+          {isAdmin && (
+            <span className="text-[10px] bg-[#dbeafe] text-[#1e3a8a] px-3 py-1 rounded font-bold uppercase flex items-center gap-1"><ShieldCheck size={12}/> Painel Fechado para Edição Externa</span>
+          )}
         </div>
       </div>
-
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
-            <div className="flex items-center justify-between p-6 border-b border-slate-100">
-              <h2 className="text-xl font-bold text-slate-800">{editingClient ? 'Editar Alocação' : `Alocar ao ${currentDepartment}`}</h2>
-              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600 transition-colors"><X size={20} /></button>
-            </div>
-            <form onSubmit={handleSaveClient} className="p-6 space-y-4">
-              
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Empresa Base</label>
-                <select 
-                  required 
-                  value={selectedEmpresaBaseId} 
-                  onChange={(e) => handleEmpresaBaseChange(e.target.value)} 
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-[#2563eb] font-bold text-slate-800"
-                >
-                  <option value="">Selecione uma empresa...</option>
-                  {empresasDisponiveis.map(emp => <option key={emp.id} value={emp.id}>{emp.nome}</option>)}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Responsável</label>
-                <select required value={formData.responsavel || ''} onChange={(e) => setFormData({...formData, responsavel: e.target.value})} className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-[#2563eb]">
-                  <option value="">Selecione...</option>
-                  {responsaveisDoDepartamento.map(r => <option key={r} value={r}>{r}</option>)}
-                </select>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Atividade</label>
-                  <select required value={formData.atividade || ''} onChange={(e) => setFormData({...formData, atividade: e.target.value})} className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-[#2563eb]">
-                    <option value="">Selecione...</option>
-                    {settings.atividades.map(a => <option key={a} value={a}>{a}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Prioridade</label>
-                  <select required value={formData.prioridade || ''} onChange={(e) => setFormData({...formData, prioridade: e.target.value})} className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-[#2563eb]">
-                    <option value="">Selecione...</option>
-                    {settings.prioridades.map(p => <option key={p} value={p}>{p}</option>)}
-                  </select>
-                </div>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Tributação</label>
-                <input 
-                  type="text" 
-                  value={formData.tributacao || ''} 
-                  disabled 
-                  className="w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-lg text-slate-500 font-bold cursor-not-allowed"
-                  title="Herdado do Cadastro Global"
-                />
-              </div>
-              
-              <div className="flex flex-col gap-2 pt-2">
-                <div className="flex items-center gap-2 bg-slate-50 p-3 rounded-lg border border-slate-200">
-                  <input type="checkbox" id="sem_movimento" checked={formData.sem_movimento || false} onChange={(e) => setFormData({...formData, sem_movimento: e.target.checked})} className="w-4 h-4 text-[#2563eb] rounded border-slate-300 cursor-pointer focus:ring-[#2563eb]" />
-                  <label htmlFor="sem_movimento" className="text-sm font-medium text-slate-700 cursor-pointer">Marcar empresa como "Sem Movimento"</label>
-                </div>
-                
-                <div className="flex items-center gap-2 bg-red-50 p-3 rounded-lg border border-red-100">
-                  <input type="checkbox" id="is_inactive" checked={formData.is_inactive || false} onChange={(e) => setFormData({...formData, is_inactive: e.target.checked})} className="w-4 h-4 text-red-600 rounded border-red-300 cursor-pointer focus:ring-red-600" />
-                  <label htmlFor="is_inactive" className="text-sm font-bold text-red-700 cursor-pointer">Inativar empresa (Ex-cliente)</label>
-                </div>
-              </div>
-
-              <div className="pt-4 flex justify-end gap-3">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-slate-600 font-medium hover:bg-slate-100 rounded-lg transition-colors">Cancelar</button>
-                <button type="submit" className="px-4 py-2 bg-[#F26522] hover:bg-[#d9551c] text-white font-bold rounded-lg transition-colors shadow-sm">Salvar Alocação</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
