@@ -29,6 +29,9 @@ const formatDateForSearch = (dateStr?: string) => {
   return dateStr;
 };
 
+// LISTA DE ADMINISTRADORES DO SISTEMA (Para destravar validação do Gestor)
+const ADMIN_EMAILS = ['jeyson@vsmweb.com.br', 'cristiane.cardoso@vsmweb.com.br'];
+
 export function Pdi({ currentDepartment }: { currentDepartment: string }) {
   const [isAdmin, setIsAdmin] = useState(false);
   const [userEmail, setUserEmail] = useState('');
@@ -54,7 +57,7 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
     supabase.auth.getSession().then(({ data }) => {
       const email = data.session?.user.email?.toLowerCase().trim() || '';
       setUserEmail(email);
-      setIsAdmin(email === 'jeyson@vsmweb.com.br');
+      setIsAdmin(ADMIN_EMAILS.includes(email));
       setAuthLoaded(true);
     });
   }, []);
@@ -132,20 +135,17 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
         const combined: PdiEntry[] = [...validDbEntries];
         setBaseClients(activeClients); 
 
-        // NOVO CÉREBRO: LER METAS VINCULADAS
         const deptMetasGlobais = (settings.metas_globais || []).filter(m => m.departamento === currentDepartment);
 
         activeClients.forEach((client: Client) => {
           const empBase = (settings.empresas_base || []).find(e => e.nome === client.empresa);
           
           if (empBase && empBase.metas_vinculadas) {
-            // Filtra as metas vinculadas que pertencem ao setor atual
             const linkedDeptMetas = empBase.metas_vinculadas.filter(mv => deptMetasGlobais.some(dmg => dmg.id === mv.metaId));
 
             linkedDeptMetas.forEach(mv => {
               const metaDef = deptMetasGlobais.find(dmg => dmg.id === mv.metaId);
               if (metaDef) {
-                // Verifica se a meta já foi criada no banco de dados para este mês
                 const exists = validDbEntries.find(e => e.empresa === client.empresa && e.atividade === metaDef.nome && !e.is_extra);
                 
                 if (!exists) {
