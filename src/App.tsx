@@ -27,6 +27,9 @@ import {
   Settings 
 } from 'lucide-react';
 
+// LISTA DE ADMINISTRADORES DO SISTEMA
+const ADMIN_EMAILS = ['jeyson@vsmweb.com.br', 'cristiane.cardoso@vsmweb.com.br'];
+
 export default function App() {
   const [session, setSession] = useState<any>(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -70,7 +73,7 @@ export default function App() {
         setGlobalSettings(data);
         const globalDepts = data.departamentos || ['Contábil', 'Fiscal', 'Pessoal'];
         const email = session.user.email.toLowerCase().trim();
-        const isAdmin = email === 'jeyson@vsmweb.com.br';
+        const isAdmin = ADMIN_EMAILS.includes(email);
 
         if (isAdmin) {
           setAllowedDepts(globalDepts);
@@ -104,8 +107,8 @@ export default function App() {
   if (authLoading || !settingsLoaded) return <div className="min-h-screen bg-slate-50 flex items-center justify-center font-bold text-[#2563eb]">Carregando sistema...</div>;
   if (!session) return <Login />;
 
-  const userEmail = session.user.email;
-  const isAdmin = userEmail === 'jeyson@vsmweb.com.br';
+  const userEmail = session.user.email?.toLowerCase().trim() || '';
+  const isAdmin = ADMIN_EMAILS.includes(userEmail);
 
   if (allowedDepts.length === 0 && !isAdmin) {
     return (
@@ -134,7 +137,6 @@ export default function App() {
           {!isSidebarCollapsed ? (
             <>
               <img src="/logo.png" alt="VSM" className="h-10 object-contain mb-3" onError={(e) => {(e.target as HTMLImageElement).style.display = 'none';}} />
-              {/* Tag Gestão 360º atualizada com cor e tamanho maiores */}
               <span className="text-xs font-black text-[#1e3a8a] uppercase tracking-widest bg-[#dbeafe] px-3 py-1 rounded-full border border-[#bfdbfe]">Gestão 360º</span>
             </>
           ) : (
@@ -178,7 +180,6 @@ export default function App() {
           {isAdmin && (
             <>
               <div className="my-4 border-t border-slate-200"></div>
-              {/* Menu renomeado para Configurações */}
               <button onClick={() => setCurrentRoute('settings')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${currentRoute === 'settings' ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'} ${isSidebarCollapsed ? 'justify-center px-0' : ''}`}>
                 <Settings size={22} className={currentRoute === 'settings' ? 'text-slate-300' : ''} />
                 {!isSidebarCollapsed && <span className="text-sm whitespace-nowrap">Configurações</span>}
@@ -218,7 +219,6 @@ export default function App() {
             {!isSidebarCollapsed && (
               <>
                 <span className="text-xs font-bold text-slate-700 truncate w-full text-center mt-2" title={userEmail}>{userEmail}</span>
-                {/* Texto e cor alterados para o Admin */}
                 {isAdmin ? <span className="text-[9px] bg-[#dbeafe] text-[#1e3a8a] px-2 py-0.5 rounded-md font-bold uppercase tracking-widest mt-2 border border-[#bfdbfe]">Admin do Sistema</span> : <span className="text-[9px] bg-slate-200 text-slate-600 px-2 py-0.5 rounded-md font-bold uppercase tracking-widest mt-2">Analista</span>}
                 <button onClick={handleLogout} className="mt-3 flex items-center justify-center gap-2 w-full px-3 py-2 text-xs font-bold text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-transparent hover:border-red-100"><LogOut size={14} /> Sair</button>
               </>
@@ -228,7 +228,6 @@ export default function App() {
                <button onClick={handleLogout} className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Sair"><LogOut size={18} /></button>
             )}
 
-            {/* O Botão de Informação restaurado com seus Tooltips */}
             {!isSidebarCollapsed && (
               <div className="absolute -top-3 -right-2 group flex z-50">
                 <button className="bg-white border border-slate-200 text-slate-400 p-1 rounded-full hover:text-[#2563eb] hover:bg-[#f0f4ff] transition-colors shadow-sm cursor-help relative z-10"><Info size={12} /></button>
