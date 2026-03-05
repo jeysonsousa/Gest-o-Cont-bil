@@ -6,7 +6,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../supabase';
 import { PdiEntry, Client, AppSettings, MONTHS, Status, StatusRecord, UsuarioConfig } from '../types';
-import { Save, Plus, Trash2, Target, Check, CheckCheck, Search, ShieldAlert, ChevronDown, ChevronUp, CalendarClock, AlertCircle } from 'lucide-react';
+import { Save, Plus, Trash2, Target, Check, CheckCheck, Search, ShieldAlert, ChevronDown, ChevronUp, CalendarClock, AlertCircle, X } from 'lucide-react';
 
 const currentYearNum = new Date().getFullYear();
 const YEARS = Array.from({ length: 5 }, (_, i) => (currentYearNum - 1 + i).toString());
@@ -50,6 +50,10 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
 
   const [showPending, setShowPending] = useState(true);
   const [showCompleted, setShowCompleted] = useState(false);
+
+  // ESTADOS DOS MODAIS EXPANSÍVEIS
+  const [showHojeModal, setShowHojeModal] = useState(false);
+  const [showAtrasadasModal, setShowAtrasadasModal] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -106,7 +110,7 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
         return;
       }
       setLoading(true);
-      setSearchTerm(''); 
+      // REMOVIDO o setSearchTerm('') daqui para não apagar a sua pesquisa ao voltar para a aba!
 
       try {
         const { data: clientsData } = await supabase.from('clients')
@@ -131,7 +135,6 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
         const combined: PdiEntry[] = [...validDbEntries];
         setBaseClients(activeClients); 
 
-        // O CÉREBRO AGORA É BLINDADO CONTRA ERROS DE ESPAÇAMENTO E CAIXA ALTA/BAIXA
         const deptMetasGlobais = (settings.metas_globais || []).filter(m => m.departamento.toUpperCase().trim() === currentDepartment.toUpperCase().trim());
 
         activeClients.forEach((client: Client) => {
@@ -185,22 +188,22 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
     return { avg, total, completed };
   }, [localData]);
 
-  // CÁLCULO DAS TAREFAS DO DIA
-  const { tarefasHoje, tarefasAtrasadas } = useMemo(() => {
+  // CÁLCULO E EXTRAÇÃO DAS TAREFAS DO DIA PARA OS MODAIS
+  const { tarefasHojeList, tarefasAtrasadasList } = useMemo(() => {
     const todayDate = new Date();
     const offset = todayDate.getTimezoneOffset();
     const todayStr = new Date(todayDate.getTime() - (offset*60*1000)).toISOString().split('T')[0];
 
-    let hoje = 0;
-    let atrasadas = 0;
+    let hoje: {row: PdiEntry, index: number}[] = [];
+    let atrasadas: {row: PdiEntry, index: number}[] = [];
 
-    localData.forEach(row => {
+    localData.forEach((row, index) => {
       if (row.status === 'n' && row.termino) {
-        if (row.termino === todayStr) hoje++;
-        else if (row.termino < todayStr) atrasadas++;
+        if (row.termino === todayStr) hoje.push({row, index});
+        else if (row.termino < todayStr) atrasadas.push({row, index});
       }
     });
-    return { tarefasHoje: hoje, tarefasAtrasadas: atrasadas };
+    return { tarefasHojeList: hoje, tarefasAtrasadasList: atrasadas };
   }, [localData]);
 
   const groupedTasks = useMemo(() => {
@@ -285,7 +288,7 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
         }
 
         if (!row.is_extra) {
-          const client = baseClients.find(c => c.empresa === row.empresa);
+          const client = baseClients.find(c => c.empresa.toUpperCase() === row.empresa.toUpperCase());
           if (client) {
             const monthKey = `${activeMonth}-${activeYear}`;
             const isPdiCompleted = row.status === 'analyst' || row.status === 'ok';
@@ -392,7 +395,6 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
         </div>
       ) : (
         <>
-          {/* NOVO LAYOUT DOS CARDS SUPERIORES: REDUZIDOS E INTELIGENTES */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             
             {/* 1. Desempenho (Evolução) */}
@@ -421,24 +423,24 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
               <p className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded inline-block w-fit">Metas Validadas</p>
             </div>
 
-            {/* 3. Tarefas Hoje */}
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col justify-between relative overflow-hidden group">
-              <div className="absolute right-0 top-0 bottom-0 w-1 bg-amber-400 transition-all"></div>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-1">
+            {/* 3. Tarefas Hoje (AGORA É CLICÁVEL) */}
+            <div onClick={() => setShowHojeModal(true)} className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col justify-between relative overflow-hidden group cursor-pointer hover:shadow-md transition-all hover:-translate-y-0.5">
+              <div className="absolute right-0 top-0 bottom-0 w-1 bg-amber-400 transition-all group-hover:w-2"></div>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-1 group-hover:text-amber-500 transition-colors">
                 <CalendarClock size={12}/> Vencem Hoje
               </p>
-              <h3 className="text-3xl font-black text-amber-500 mb-1">{tarefasHoje}</h3>
-              <p className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded inline-block w-fit">Atenção ao Prazo</p>
+              <h3 className="text-3xl font-black text-amber-500 mb-1">{tarefasHojeList.length}</h3>
+              <p className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded inline-block w-fit">Ver Lista</p>
             </div>
 
-            {/* 4. Atrasadas */}
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col justify-between relative overflow-hidden group">
-              <div className="absolute right-0 top-0 bottom-0 w-1 bg-red-500 transition-all"></div>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-1">
+            {/* 4. Atrasadas (AGORA É CLICÁVEL) */}
+            <div onClick={() => setShowAtrasadasModal(true)} className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col justify-between relative overflow-hidden group cursor-pointer hover:shadow-md transition-all hover:-translate-y-0.5">
+              <div className="absolute right-0 top-0 bottom-0 w-1 bg-red-500 transition-all group-hover:w-2"></div>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-1 group-hover:text-red-500 transition-colors">
                 <AlertCircle size={12}/> Atrasadas
               </p>
-              <h3 className="text-3xl font-black text-red-500 mb-1">{tarefasAtrasadas}</h3>
-              <p className="text-[10px] font-bold text-red-700 bg-red-50 px-2 py-0.5 rounded inline-block w-fit">Requer Ação</p>
+              <h3 className="text-3xl font-black text-red-500 mb-1">{tarefasAtrasadasList.length}</h3>
+              <p className="text-[10px] font-bold text-red-700 bg-red-50 px-2 py-0.5 rounded inline-block w-fit">Ver Lista</p>
             </div>
             
           </div>
@@ -532,6 +534,74 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
           </div>
         </>
       )}
+
+      {/* MODAL TAREFAS DE HOJE */}
+      {showHojeModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col animate-fade-in">
+            <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-amber-50 rounded-t-2xl">
+              <h2 className="text-lg font-black text-amber-600 flex items-center gap-2"><CalendarClock size={20}/> Tarefas que Vencem Hoje</h2>
+              <button onClick={() => setShowHojeModal(false)} className="text-amber-400 hover:text-amber-600 bg-white p-1 rounded-full"><X size={20}/></button>
+            </div>
+            <div className="overflow-auto p-4 flex-1">
+              <table className="w-full text-left text-sm border border-slate-100 rounded-xl overflow-hidden shadow-sm">
+                <thead className="bg-slate-50 text-slate-500 text-[10px] uppercase tracking-wider">
+                  <tr><th className="px-4 py-2">Empresa</th><th className="px-4 py-2">Ação</th><th className="px-4 py-2 text-right">Ação Rápida</th></tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 bg-white">
+                  {tarefasHojeList.map(item => (
+                    <tr key={item.index} className="hover:bg-slate-50 group">
+                      <td className="px-4 py-3 font-bold text-slate-800 text-xs">{item.row.empresa}</td>
+                      <td className="px-4 py-3 text-[#1e3a8a] font-bold text-[10px] uppercase">{item.row.atividade}</td>
+                      <td className="px-4 py-3 text-right">
+                        <button onClick={() => handleAnalystConfirm(item.index)} className="text-[10px] bg-slate-100 hover:bg-emerald-100 text-slate-500 hover:text-emerald-600 font-bold px-3 py-1.5 rounded transition-colors uppercase flex items-center justify-end gap-1 ml-auto">
+                          <Check size={12}/> Concluir
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {tarefasHojeList.length === 0 && <tr><td colSpan={3} className="p-6 text-center text-slate-400 font-medium">Você não tem mais tarefas para hoje!</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL TAREFAS ATRASADAS */}
+      {showAtrasadasModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col animate-fade-in">
+            <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-red-50 rounded-t-2xl">
+              <h2 className="text-lg font-black text-red-600 flex items-center gap-2"><AlertCircle size={20}/> Tarefas Atrasadas</h2>
+              <button onClick={() => setShowAtrasadasModal(false)} className="text-red-400 hover:text-red-600 bg-white p-1 rounded-full"><X size={20}/></button>
+            </div>
+            <div className="overflow-auto p-4 flex-1">
+              <table className="w-full text-left text-sm border border-slate-100 rounded-xl overflow-hidden shadow-sm">
+                <thead className="bg-slate-50 text-slate-500 text-[10px] uppercase tracking-wider">
+                  <tr><th className="px-4 py-2">Empresa</th><th className="px-4 py-2">Ação</th><th className="px-4 py-2 text-center">Venceu em</th><th className="px-4 py-2 text-right">Ação Rápida</th></tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 bg-white">
+                  {tarefasAtrasadasList.map(item => (
+                    <tr key={item.index} className="hover:bg-slate-50 group">
+                      <td className="px-4 py-3 font-bold text-slate-800 text-xs">{item.row.empresa}</td>
+                      <td className="px-4 py-3 text-[#1e3a8a] font-bold text-[10px] uppercase">{item.row.atividade}</td>
+                      <td className="px-4 py-3 text-center text-red-500 font-bold text-xs">{item.row.termino?.split('-').reverse().join('/')}</td>
+                      <td className="px-4 py-3 text-right">
+                        <button onClick={() => handleAnalystConfirm(item.index)} className="text-[10px] bg-slate-100 hover:bg-emerald-100 text-slate-500 hover:text-emerald-600 font-bold px-3 py-1.5 rounded transition-colors uppercase flex items-center justify-end gap-1 ml-auto">
+                          <Check size={12}/> Concluir
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {tarefasAtrasadasList.length === 0 && <tr><td colSpan={4} className="p-6 text-center text-slate-400 font-medium">Nenhuma tarefa atrasada!</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
