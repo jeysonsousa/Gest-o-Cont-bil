@@ -50,7 +50,6 @@ export function Dashboard({ isAdmin, currentDepartment }: DashboardProps) {
   const [activeMonth, setActiveMonth] = useState<string>(MONTHS[defaultMonthIndex]);
   const [activeYear, setActiveYear] = useState<string>(defaultYearNum.toString());
 
-  // RECARREGA OS DADOS QUANDO O DEPARTAMENTO MUDA
   useEffect(() => {
     async function fetchData() {
       if (!currentDepartment) return;
@@ -412,14 +411,13 @@ export function Dashboard({ isAdmin, currentDepartment }: DashboardProps) {
             </div>
             <form onSubmit={handleSaveClient} className="p-6 space-y-4">
               
-              {/* O NOVO CAMPO DE SELEÇÃO GLOBAL DE EMPRESA */}
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Empresa Base</label>
                 <select required value={formData.empresa || ''} onChange={(e) => setFormData({...formData, empresa: e.target.value})} className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-[#2563eb] font-bold text-slate-800">
                   <option value="">Selecione uma empresa...</option>
                   {(settings.empresas || []).map(emp => <option key={emp} value={emp}>{emp}</option>)}
                 </select>
-                <p className="text-[10px] text-slate-400 mt-1">As empresas são cadastradas na aba "Configurações > Empresas Base".</p>
+                <p className="text-[10px] text-slate-400 mt-1">As empresas são cadastradas na aba "Configurações &gt; Empresas Base".</p>
               </div>
 
               <div>
