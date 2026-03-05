@@ -44,7 +44,8 @@ export interface UsuarioConfig {
   nome: string;
   email: string;
   departamentos?: string[]; 
-  isEstagiario?: boolean; // NOVO: Indicador de meio expediente fixo
+  isEstagiario?: boolean; 
+  isAdmin?: boolean; // NOVO: Controle dinâmico de Admin
 }
 
 export interface MetaGlobal {
