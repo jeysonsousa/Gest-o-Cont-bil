@@ -37,7 +37,8 @@ export interface PdiEntry {
   ano: string;
   is_extra?: boolean;
   departamento?: string; 
-  tempo_estimado?: number; // NOVO: Para exibir no balãozinho (Tooltip)
+  tempo_estimado?: number; 
+  ordem?: number; // NOVO: Para salvar a posição do arrastar e soltar
 }
 
 export interface UsuarioConfig {
