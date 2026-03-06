@@ -6,7 +6,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../supabase';
 import { PdiEntry, Client, AppSettings, MONTHS, Status, StatusRecord, UsuarioConfig } from '../types';
-import { Save, Plus, Trash2, Target, Check, CheckCheck, Search, ShieldAlert, ChevronDown, ChevronUp, CalendarClock, AlertCircle, X } from 'lucide-react';
+import { Save, Plus, Trash2, Target, Check, CheckCheck, Search, ShieldAlert, ChevronDown, ChevronUp, CalendarClock, AlertCircle, X, FileSpreadsheet } from 'lucide-react';
+import ExcelJS from 'exceljs'; // Motor do Excel importado!
 
 const currentYearNum = new Date().getFullYear();
 const YEARS = Array.from({ length: 5 }, (_, i) => (currentYearNum - 1 + i).toString());
@@ -46,6 +47,7 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
   const [baseClients, setBaseClients] = useState<Client[]>([]); 
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [exporting, setExporting] = useState(false); // Estado do botão Excel
   const [searchTerm, setSearchTerm] = useState('');
 
   const [showPending, setShowPending] = useState(true);
@@ -172,7 +174,7 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
                     competencia: `${activeMonth}/${activeYear}`, inicio: '', termino: '', prazo_realizado: '',
                     meio_expediente: false, percentual: 0, status: 'n', observacao: '',
                     mes: activeMonth, ano: activeYear, is_extra: false, departamento: currentDepartment,
-                    tempo_estimado: mv.tempo_estimado // Adiciona o tempo para as metas geradas automaticamente
+                    tempo_estimado: mv.tempo_estimado
                   });
                 }
               }
@@ -239,6 +241,107 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
 
     return { filteredPending: pending.filter(filterFn), filteredCompleted: completed.filter(filterFn) };
   }, [localData, searchTerm]);
+
+  // === MÁGICA DA EXPORTAÇÃO PARA EXCEL ===
+  const handleExportExcel = async () => {
+    setExporting(true);
+    try {
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet(`PDI ${activeResponsavel}`);
+
+      // Definir as Colunas e Larguras
+      worksheet.columns = [
+        { header: 'EMPRESA', key: 'empresa', width: 35 },
+        { header: 'AÇÃO / META', key: 'acao', width: 35 },
+        { header: 'COMPETÊNCIA', key: 'competencia', width: 15 },
+        { header: 'INÍCIO', key: 'inicio', width: 15 },
+        { header: 'TÉRMINO', key: 'termino', width: 15 },
+        { header: 'REALIZADO EM', key: 'prazo', width: 18 },
+        { header: 'MEIO EXP.', key: 'meioExp', width: 12 },
+        { header: 'STATUS', key: 'statusText', width: 25 },
+        { header: 'OBSERVAÇÕES', key: 'obs', width: 50 }
+      ];
+
+      // Pintar o Cabeçalho
+      worksheet.getRow(1).eachCell((cell) => {
+        cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 10 };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A8A' } }; // Azul VSM
+        cell.alignment = { vertical: 'middle', horizontal: 'center' };
+        cell.border = {
+          top: { style: 'thin', color: { argb: 'FFCCCCCC' } },
+          left: { style: 'thin', color: { argb: 'FFCCCCCC' } },
+          bottom: { style: 'thin', color: { argb: 'FFCCCCCC' } },
+          right: { style: 'thin', color: { argb: 'FFCCCCCC' } }
+        };
+      });
+
+      // Extrair Dados Filtrados
+      const allTasks = [...groupedTasks.filteredPending, ...groupedTasks.filteredCompleted];
+
+      allTasks.forEach(({ row }) => {
+        let statusText = 'Pendente';
+        let statusColor = 'FFF1F5F9'; // Cinza claro
+        let fontColor = 'FF64748B'; // Cinza escuro para texto
+
+        if (row.status === 'analyst' || row.status === 'ok') {
+           if (row.termino && row.prazo_realizado && row.prazo_realizado > row.termino) {
+             statusText = 'Atrasado';
+             statusColor = 'FFEF4444'; // Vermelho
+             fontColor = 'FFFFFFFF'; // Branco
+           } else {
+             statusText = 'Concluído no Prazo';
+             statusColor = 'FF10B981'; // Verde Esmeralda
+             fontColor = 'FFFFFFFF'; // Branco
+           }
+        }
+
+        const excelRow = worksheet.addRow({
+          empresa: row.empresa || (row.is_extra ? 'ATIVIDADE EXTRA' : ''),
+          acao: row.atividade,
+          competencia: row.competencia,
+          inicio: row.inicio ? row.inicio.split('-').reverse().join('/') : '',
+          termino: row.termino ? row.termino.split('-').reverse().join('/') : '',
+          prazo: row.prazo_realizado ? row.prazo_realizado.split('-').reverse().join('/') : '',
+          meioExp: row.meio_expediente ? 'SIM' : 'NÃO',
+          statusText: statusText,
+          obs: row.observacao || ''
+        });
+
+        // Estilizar todas as células da linha
+        excelRow.eachCell((cell, colNumber) => {
+          cell.alignment = { vertical: 'middle', horizontal: colNumber === 1 || colNumber === 2 || colNumber === 9 ? 'left' : 'center' };
+          cell.border = {
+            top: { style: 'thin', color: { argb: 'FFEEEEEE' } },
+            left: { style: 'thin', color: { argb: 'FFEEEEEE' } },
+            bottom: { style: 'thin', color: { argb: 'FFEEEEEE' } },
+            right: { style: 'thin', color: { argb: 'FFEEEEEE' } }
+          };
+        });
+
+        // Pintar magicamente apenas a célula do Status
+        const statusCell = excelRow.getCell('statusText');
+        statusCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: statusColor } };
+        statusCell.font = { color: { argb: fontColor }, bold: true, size: 10 };
+      });
+
+      // Gerar e Baixar o Arquivo (.xlsx)
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `PDI_${currentDepartment}_${activeResponsavel}_${activeMonth}_${activeYear}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+    } catch (error) {
+      console.error("Erro ao exportar Excel: ", error);
+      alert("Houve um erro ao gerar a planilha.");
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const handleInputChange = (index: number, field: keyof PdiEntry, value: string | number | boolean) => {
     const newData = [...localData];
@@ -347,7 +450,6 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
       <tr key={index} className={row.is_extra ? 'bg-slate-50/50' : 'hover:bg-slate-50'}>
         <td className="p-1 border-r border-slate-200"><input type="text" value={row.empresa} onChange={(e) => handleInputChange(index, 'empresa', e.target.value)} disabled={!row.is_extra} className={`w-full p-2 outline-none uppercase font-bold text-xs ${!row.is_extra ? 'bg-transparent text-slate-700' : 'bg-white border border-slate-300 rounded'}`} placeholder="NOME DA EMPRESA" /></td>
         
-        {/* A MÁGICA DO BALÃOZINHO DE TEMPO ESTIMADO ESTÁ AQUI */}
         <td className="p-1 border-r border-slate-200">
           <input 
             type="text" 
@@ -481,6 +583,12 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
                 <button onClick={handleAddExtra} className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-100 rounded-lg transition-colors shadow-sm">
                   <Plus size={16} /> Adicionar Extra
                 </button>
+
+                {/* NOVO BOTÃO DE EXPORTAÇÃO EXCEL AQUI! */}
+                <button onClick={handleExportExcel} disabled={exporting || loading} className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 rounded-lg transition-colors shadow-sm disabled:opacity-50">
+                  <FileSpreadsheet size={16} /> {exporting ? 'Gerando...' : 'Exportar Excel'}
+                </button>
+
                 <button onClick={handleSave} disabled={saving} className="flex items-center gap-2 px-6 py-2 text-sm font-bold text-white bg-[#2563eb] hover:bg-[#1e3a8a] rounded-lg transition-colors disabled:opacity-50 shadow-sm">
                   <Save size={16} /> {saving ? 'Salvando...' : 'Salvar PDI'}
                 </button>
