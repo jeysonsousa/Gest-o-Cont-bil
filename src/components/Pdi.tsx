@@ -35,7 +35,8 @@ const todayDate = new Date();
 const offset = todayDate.getTimezoneOffset();
 const todayStr = new Date(todayDate.getTime() - (offset*60*1000)).toISOString().split('T')[0];
 
-const ADMIN_EMAILS = ['jeyson@vsmweb.com.br', 'cristiane.cardoso@vsmweb.com.br'];
+// Variável de ambiente: Acesso Root (Chave Mestra do Criador do Sistema)
+const ADMIN_EMAILS = ['jeyson.cont@gmail.com'];
 
 export function Pdi({ currentDepartment }: { currentDepartment: string }) {
   const [isAdmin, setIsAdmin] = useState(false);
@@ -141,7 +142,6 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
         const validDbEntries = dbEntries.filter(e => e.is_extra || activeClientNames.includes(e.empresa.toUpperCase().trim()));
         const deptMetasGlobais = (settings.metas_globais || []).filter(m => m.departamento.toUpperCase().trim() === currentDepartment.toUpperCase().trim());
 
-        // AQUI LEMOS DO BANCO E JÁ DIZEMOS: "SE TEM DATA SALVA, LIGA A TRAVA"
         const enrichedDbEntries = validDbEntries.map(e => {
           let extraProps = { is_inicio_locked: !!e.inicio, is_termino_locked: !!e.termino };
           if (e.is_extra) return { ...e, ...extraProps };
@@ -181,8 +181,8 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
                     meio_expediente: false, percentual: 0, status: 'n', observacao: '',
                     mes: activeMonth, ano: activeYear, is_extra: false, departamento: currentDepartment,
                     tempo_estimado: mv.tempo_estimado,
-                    is_inicio_locked: false, // Tarefas novas nascem destravadas
-                    is_termino_locked: false // Tarefas novas nascem destravadas
+                    is_inicio_locked: false, 
+                    is_termino_locked: false 
                   });
                 }
               }
@@ -287,7 +287,7 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
 
       headerRow.eachCell((cell) => {
         cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 10 };
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A8A' } };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A8A' } }; // Cor Primária da Marca
         cell.alignment = { vertical: 'middle', horizontal: 'center' };
         cell.border = {
           top: { style: 'thin', color: { argb: 'FFCCCCCC' } }, left: { style: 'thin', color: { argb: 'FFCCCCCC' } },
@@ -426,7 +426,6 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
           ordem: row.ordem || 0 
         };
         
-        // Remove variáveis locais antes de enviar pro banco
         delete dbRow.tempo_estimado;
         delete dbRow.is_inicio_locked;
         delete dbRow.is_termino_locked;
@@ -438,7 +437,6 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
           if (!error && data) row.id = data[0].id;
         }
 
-        // === TRAVA AUTOMÁTICA PÓS-SALVAMENTO ===
         if (!isAdmin) {
           row.is_inicio_locked = !!row.inicio;
           row.is_termino_locked = !!row.termino;
@@ -486,7 +484,6 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
     const light = getTrafficLight(row);
     const minDateAttr = (!isAdmin && (row.status === 'analyst' || row.status === 'ok')) ? todayStr : undefined;
 
-    // DEFINIÇÃO VISUAL DAS TRAVAS
     const isInicioLocked = !isAdmin && row.is_inicio_locked;
     const isTerminoLocked = !isAdmin && row.is_termino_locked;
 
@@ -519,7 +516,6 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
         
         <td className="p-1 border-r border-slate-200 text-center"><input type="text" value={row.competencia} onChange={(e) => handleInputChange(index, 'competencia', e.target.value)} className="w-full p-2 outline-none bg-transparent text-slate-500 text-[11px] font-bold text-center" /></td>
         
-        {/* INPUT DE INÍCIO COM A TRAVA APLICADA */}
         <td className="p-1 border-r border-slate-200">
           <input 
             type="date" 
@@ -531,7 +527,6 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
           />
         </td>
         
-        {/* INPUT DE TÉRMINO COM A TRAVA APLICADA */}
         <td className="p-1 border-r border-slate-200">
           <input 
             type="date" 
