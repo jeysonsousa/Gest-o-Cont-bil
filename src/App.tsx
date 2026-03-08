@@ -27,6 +27,7 @@ import {
   Settings 
 } from 'lucide-react';
 
+// Variável de ambiente simulada: Substitua pelos e-mails dos fundadores/donos do sistema
 const ADMIN_EMAILS = ['jeyson@vsmweb.com.br', 'cristiane.cardoso@vsmweb.com.br'];
 
 export default function App() {
@@ -64,7 +65,6 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // EXTRAÍMOS O USER_ID PARA BLINDAR A TELA CONTRA REFRESHES DE ABA
   const userId = session?.user?.id;
 
   useEffect(() => {
@@ -96,7 +96,6 @@ export default function App() {
 
         setIsAdminState(isUserAdmin);
 
-        // LÓGICA CORRIGIDA: Só altera o departamento se a pessoa ainda não tiver escolhido nenhum
         if (isUserAdmin) {
           setAllowedDepts(globalDepts);
           setCurrentDepartment(prev => prev && globalDepts.includes(prev) ? prev : (globalDepts[0] || ''));
@@ -112,7 +111,7 @@ export default function App() {
       setSettingsLoaded(true);
     }
     loadAccess();
-  }, [userId, currentRoute]); // Dependência alterada para não resetar quando trocar de aba
+  }, [userId, currentRoute]); 
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -150,11 +149,11 @@ export default function App() {
         <div className={`p-6 border-b border-slate-100 flex flex-col items-center justify-center min-h-[120px] transition-all ${isSidebarCollapsed ? 'p-2 min-h-[80px]' : ''}`}>
           {!isSidebarCollapsed ? (
             <>
-              <img src="/logo.png" alt="VSM" className="h-10 object-contain mb-3" onError={(e) => {(e.target as HTMLImageElement).style.display = 'none';}} />
+              <img src="/logo.png" alt="Logomarca" className="h-10 object-contain mb-3" onError={(e) => {(e.target as HTMLImageElement).style.display = 'none';}} />
               <span className="text-xs font-black text-[#1e3a8a] uppercase tracking-widest bg-[#dbeafe] px-3 py-1 rounded-full border border-[#bfdbfe]">Gestão 360º</span>
             </>
           ) : (
-             <img src="/guia.png" alt="VSM" className="h-8 object-contain" />
+             <img src="/guia.png" alt="Ícone Logomarca" className="h-8 object-contain" />
           )}
         </div>
         
