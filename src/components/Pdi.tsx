@@ -30,6 +30,11 @@ const formatDateForSearch = (dateStr?: string) => {
   return dateStr;
 };
 
+// DATA DE HOJE PARA O SISTEMA ANTIFRAUDE (Ajuste de Fuso Horário Brasil)
+const todayDate = new Date();
+const offset = todayDate.getTimezoneOffset();
+const todayStr = new Date(todayDate.getTime() - (offset*60*1000)).toISOString().split('T')[0];
+
 const ADMIN_EMAILS = ['jeyson@vsmweb.com.br', 'cristiane.cardoso@vsmweb.com.br'];
 
 export function Pdi({ currentDepartment }: { currentDepartment: string }) {
@@ -184,7 +189,6 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
           }
         });
 
-        // NOVA LÓGICA DE ORDENAÇÃO: Dá prioridade para a coluna 'ordem' criada com o mouse
         combined.sort((a, b) => {
           if (a.ordem !== undefined && b.ordem !== undefined && a.ordem !== b.ordem) {
             return a.ordem - b.ordem;
@@ -212,10 +216,6 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
   }, [localData]);
 
   const { tarefasHojeList, tarefasAtrasadasList } = useMemo(() => {
-    const todayDate = new Date();
-    const offset = todayDate.getTimezoneOffset();
-    const todayStr = new Date(todayDate.getTime() - (offset*60*1000)).toISOString().split('T')[0];
-
     let hoje: {row: PdiEntry, index: number}[] = [];
     let atrasadas: {row: PdiEntry, index: number}[] = [];
 
@@ -248,17 +248,12 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
     return { filteredPending: pending.filter(filterFn), filteredCompleted: completed.filter(filterFn) };
   }, [localData, searchTerm]);
 
-  // === FUNÇÕES DE ARRASTAR E SOLTAR (DRAG AND DROP) ===
   const handleDrop = (targetIndex: number) => {
     if (draggedIndex === null || draggedIndex === targetIndex) return;
-    
     const newData = [...localData];
     const draggedItem = newData.splice(draggedIndex, 1)[0];
     newData.splice(targetIndex, 0, draggedItem);
-
-    // Atualiza a propriedade "ordem" de todas as linhas para salvar no banco
     const updatedData = newData.map((item, idx) => ({ ...item, ordem: idx }));
-    
     setLocalData(updatedData);
     setDraggedIndex(null);
   };
@@ -269,20 +264,12 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet(`PDI ${activeResponsavel}`);
 
-      // 1. Configurar Largura das Colunas
       worksheet.columns = [
-        { key: 'empresa', width: 35 },
-        { key: 'acao', width: 35 },
-        { key: 'competencia', width: 15 },
-        { key: 'inicio', width: 15 },
-        { key: 'termino', width: 15 },
-        { key: 'prazo', width: 18 },
-        { key: 'meioExp', width: 12 },
-        { key: 'statusText', width: 25 },
-        { key: 'obs', width: 50 }
+        { key: 'empresa', width: 35 }, { key: 'acao', width: 35 }, { key: 'competencia', width: 15 },
+        { key: 'inicio', width: 15 }, { key: 'termino', width: 15 }, { key: 'prazo', width: 18 },
+        { key: 'meioExp', width: 12 }, { key: 'statusText', width: 25 }, { key: 'obs', width: 50 }
       ];
 
-      // 2. CABEÇALHO EXECUTIVO (O "Crachá" do Relatório)
       const titleRow = worksheet.addRow(['RELATÓRIO DE DESEMPENHO INDIVIDUAL (PDI) - GESTÃO 360º']);
       worksheet.mergeCells('A1:I1');
       titleRow.font = { bold: true, size: 14, color: { argb: 'FF1E3A8A' } };
@@ -293,16 +280,15 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
       infoRow.font = { bold: true, size: 10, color: { argb: 'FF64748B' } };
       infoRow.alignment = { horizontal: 'center', vertical: 'middle' };
 
-      worksheet.addRow([]); // Linha em branco para dar respiro
+      worksheet.addRow([]); 
 
-      // 3. Títulos da Tabela
       const headerRow = worksheet.addRow([
         'EMPRESA', 'AÇÃO / META', 'COMPETÊNCIA', 'INÍCIO', 'TÉRMINO', 'REALIZADO EM', 'MEIO EXP.', 'STATUS', 'OBSERVAÇÕES'
       ]);
 
       headerRow.eachCell((cell) => {
         cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 10 };
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A8A' } }; // Azul VSM
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A8A' } };
         cell.alignment = { vertical: 'middle', horizontal: 'center' };
         cell.border = {
           top: { style: 'thin', color: { argb: 'FFCCCCCC' } }, left: { style: 'thin', color: { argb: 'FFCCCCCC' } },
@@ -310,22 +296,21 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
         };
       });
 
-      // 4. Injetar os Dados
       const allTasks = [...groupedTasks.filteredPending, ...groupedTasks.filteredCompleted];
 
       allTasks.forEach(({ row }) => {
         let statusText = 'Pendente';
-        let statusColor = 'FFF1F5F9'; // Cinza claro
-        let fontColor = 'FF64748B'; // Cinza escuro para texto
+        let statusColor = 'FFF1F5F9'; 
+        let fontColor = 'FF64748B'; 
 
         if (row.status === 'analyst' || row.status === 'ok') {
            if (row.termino && row.prazo_realizado && row.prazo_realizado > row.termino) {
              statusText = 'Atrasado (Fora do Prazo)';
-             statusColor = 'FFEF4444'; // Vermelho
+             statusColor = 'FFEF4444'; 
              fontColor = 'FFFFFFFF'; 
            } else {
              statusText = 'Concluído no Prazo';
-             statusColor = 'FF10B981'; // Verde Esmeralda
+             statusColor = 'FF10B981'; 
              fontColor = 'FFFFFFFF'; 
            }
         }
@@ -350,7 +335,6 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
           };
         });
 
-        // Pintar a Célula de Status individualmente
         const statusCell = excelRow.getCell('statusText');
         statusCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: statusColor } };
         statusCell.font = { color: { argb: fontColor }, bold: true, size: 10 };
@@ -403,7 +387,7 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
     const row = newData[index];
     if (row.status === 'n') {
       newData[index].status = 'analyst';
-      if (!row.prazo_realizado) newData[index].prazo_realizado = new Date().toISOString().split('T')[0];
+      if (!row.prazo_realizado) newData[index].prazo_realizado = todayStr;
     } else {
       newData[index].status = 'n';
     }
@@ -419,6 +403,18 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
   };
 
   const handleSave = async () => {
+    // === SISTEMA ANTIFRAUDE: CHECAGEM ANTES DE SALVAR ===
+    if (!isAdmin) {
+      const invalidEntry = localData.find(row => {
+        return (row.status === 'analyst' || row.status === 'ok') && row.prazo_realizado && row.prazo_realizado < todayStr;
+      });
+
+      if (invalidEntry) {
+        alert(`AÇÃO BLOQUEADA! Você está tentando salvar a tarefa "${invalidEntry.atividade}" da empresa "${invalidEntry.empresa}" com uma data de realização (${invalidEntry.prazo_realizado?.split('-').reverse().join('/')}) retroativa. \n\nO sistema só permite informar que a tarefa foi concluída a partir de hoje.`);
+        return; 
+      }
+    }
+
     setSaving(true);
     try {
       for (const row of localData) {
@@ -426,7 +422,7 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
           ...row, inicio: row.inicio || null, termino: row.termino || null,
           prazo_realizado: row.prazo_realizado || null, meio_expediente: row.meio_expediente || false,
           departamento: currentDepartment,
-          ordem: row.ordem || 0 // Salva a posição exata
+          ordem: row.ordem || 0 
         };
         
         delete dbRow.tempo_estimado;
@@ -477,6 +473,9 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
 
   const renderRow = (row: PdiEntry, index: number) => {
     const light = getTrafficLight(row);
+    // Para analistas, a data mínima no calendário é hoje. Admins podem colocar qualquer data.
+    const minDateAttr = (!isAdmin && (row.status === 'analyst' || row.status === 'ok')) ? todayStr : undefined;
+
     return (
       <tr 
         key={index} 
@@ -486,7 +485,6 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
         onDrop={() => handleDrop(index)}
         className={`${row.is_extra ? 'bg-slate-50/50' : 'hover:bg-slate-50'} transition-all ${draggedIndex === index ? 'opacity-50 scale-[0.99] border-2 border-dashed border-[#2563eb]' : ''}`}
       >
-        {/* NOVA COLUNA COM ÍCONE DE ARRASTAR */}
         <td className="p-1 border-r border-slate-200 text-center cursor-grab active:cursor-grabbing text-slate-300 hover:text-[#2563eb]">
           <GripVertical size={16} className="mx-auto" title="Clique e arraste para reordenar" />
         </td>
@@ -510,7 +508,8 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
         <td className="p-1 border-r border-slate-200"><input type="date" value={row.termino || ''} onChange={(e) => handleInputChange(index, 'termino', e.target.value)} className="w-full p-1.5 outline-none bg-white border border-slate-200 rounded text-xs font-medium text-slate-600 focus:border-[#2563eb]" /></td>
         <td className="p-1 border-r border-slate-200 bg-slate-50/50">
           <div className="flex flex-col gap-1 items-center">
-            <input type="date" value={row.prazo_realizado || ''} onChange={(e) => handleInputChange(index, 'prazo_realizado', e.target.value)} className="w-full p-1.5 outline-none bg-white border border-slate-200 rounded text-xs font-bold text-[#1e3a8a] focus:border-[#2563eb]" />
+            {/* O Calendário de Prazo Realizado com a Trava Ativa */}
+            <input type="date" min={minDateAttr} value={row.prazo_realizado || ''} onChange={(e) => handleInputChange(index, 'prazo_realizado', e.target.value)} className={`w-full p-1.5 outline-none bg-white border border-slate-200 rounded text-xs font-bold text-[#1e3a8a] focus:border-[#2563eb] ${(!isAdmin && row.status !== 'n' && row.prazo_realizado && row.prazo_realizado < todayStr) ? 'border-red-500 text-red-600' : ''}`} title={!isAdmin ? "Apenas datas a partir de hoje" : "O Administrador pode editar livremente"} />
             <label className="flex items-center gap-1 cursor-pointer hover:bg-slate-200 px-1.5 rounded transition-colors" title="Marque se utilizou apenas meio expediente">
               <input type="checkbox" checked={row.meio_expediente || false} onChange={(e) => handleInputChange(index, 'meio_expediente', e.target.checked)} className="w-3 h-3 text-[#2563eb] rounded border-slate-300 focus:ring-[#2563eb]" />
               <span className="text-[9px] font-bold text-slate-500 uppercase">-0,5 DIA</span>
