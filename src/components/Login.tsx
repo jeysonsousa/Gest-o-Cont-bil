@@ -1,3 +1,8 @@
+/**
+ * @developer Jeyson Lins
+ * @contact jeyson.cont@gmail.com | 91983617032
+ */
+
 import React, { useState } from 'react';
 import { supabase } from '../supabase';
 import { Lock, Mail, Loader2, ShieldCheck } from 'lucide-react';
@@ -44,7 +49,7 @@ export function Login() {
 
         <form onSubmit={handleLogin} className="space-y-5">
           <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">E-mail</label>
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">E-mail Corporativo</label>
             <div className="relative">
               <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
               <input
@@ -53,7 +58,7 @@ export function Login() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-medium text-slate-700"
-                placeholder="seu@email.com"
+                placeholder="usuario@empresa.com.br"
               />
             </div>
           </div>
@@ -83,7 +88,7 @@ export function Login() {
         </form>
 
         <div className="mt-8 text-center border-t border-slate-100 pt-6">
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Dev: Jeyson Lins</p>
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tecnologia desenvolvida por: Jeyson Lins</p>
         </div>
       </div>
     </div>
