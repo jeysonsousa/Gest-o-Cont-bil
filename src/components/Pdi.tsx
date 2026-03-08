@@ -141,19 +141,19 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
         const validDbEntries = dbEntries.filter(e => e.is_extra || activeClientNames.includes(e.empresa.toUpperCase().trim()));
         const deptMetasGlobais = (settings.metas_globais || []).filter(m => m.departamento.toUpperCase().trim() === currentDepartment.toUpperCase().trim());
 
+        // AQUI LEMOS DO BANCO E JÁ DIZEMOS: "SE TEM DATA SALVA, LIGA A TRAVA"
         const enrichedDbEntries = validDbEntries.map(e => {
-          if (e.is_extra) return e;
+          let extraProps = { is_inicio_locked: !!e.inicio, is_termino_locked: !!e.termino };
+          if (e.is_extra) return { ...e, ...extraProps };
           const empBase = (settings.empresas_base || []).find(emp => emp.nome.toUpperCase().trim() === e.empresa.toUpperCase().trim());
           if (empBase && empBase.metas_vinculadas) {
             const metaDef = deptMetasGlobais.find(m => m.nome.toUpperCase().trim() === e.atividade.toUpperCase().trim());
             if (metaDef) {
               const linkedMeta = empBase.metas_vinculadas.find(mv => mv.metaId === metaDef.id);
-              if (linkedMeta) {
-                return { ...e, tempo_estimado: linkedMeta.tempo_estimado };
-              }
+              if (linkedMeta) return { ...e, ...extraProps, tempo_estimado: linkedMeta.tempo_estimado };
             }
           }
-          return e;
+          return { ...e, ...extraProps };
         });
 
         const combined: PdiEntry[] = [...enrichedDbEntries];
@@ -180,7 +180,9 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
                     competencia: `${activeMonth}/${activeYear}`, inicio: '', termino: '', prazo_realizado: '',
                     meio_expediente: false, percentual: 0, status: 'n', observacao: '',
                     mes: activeMonth, ano: activeYear, is_extra: false, departamento: currentDepartment,
-                    tempo_estimado: mv.tempo_estimado 
+                    tempo_estimado: mv.tempo_estimado,
+                    is_inicio_locked: false, // Tarefas novas nascem destravadas
+                    is_termino_locked: false // Tarefas novas nascem destravadas
                   });
                 }
               }
@@ -189,9 +191,7 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
         });
 
         combined.sort((a, b) => {
-          if (a.ordem !== undefined && b.ordem !== undefined && a.ordem !== b.ordem) {
-            return a.ordem - b.ordem;
-          }
+          if (a.ordem !== undefined && b.ordem !== undefined && a.ordem !== b.ordem) return a.ordem - b.ordem;
           if (a.is_extra !== b.is_extra) return a.is_extra ? 1 : -1;
           return a.empresa.localeCompare(b.empresa);
         });
@@ -358,11 +358,10 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
   };
 
   const handleInputChange = (index: number, field: keyof PdiEntry, value: string | number | boolean) => {
-    // === SISTEMA DE TRAVA DIRETO NO TECLADO (COM TEXTO MAIS LEVE) ===
     if (field === 'prazo_realizado' && !isAdmin && typeof value === 'string' && value !== '') {
       if (value < todayStr) {
         alert(`AÇÃO BLOQUEADA!\n\nVocê tentou inserir uma data retroativa (${value.split('-').reverse().join('/')}).\n\nO sistema só permite registrar a conclusão com a data de hoje (${todayStr.split('-').reverse().join('/')}) em diante.`);
-        return; // Retorna imediatamente e não deixa a data falsa ir para o estado da tela!
+        return; 
       }
     }
 
@@ -375,7 +374,8 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
     setLocalData([...localData, {
       responsavel: activeResponsavel, empresa: '', atividade: '', competencia: `${activeMonth}/${activeYear}`,
       inicio: '', termino: '', prazo_realizado: '', meio_expediente: false, percentual: 0, status: 'n',
-      observacao: '', mes: activeMonth, ano: activeYear, is_extra: true, departamento: currentDepartment
+      observacao: '', mes: activeMonth, ano: activeYear, is_extra: true, departamento: currentDepartment,
+      is_inicio_locked: false, is_termino_locked: false
     }]);
   };
 
@@ -414,7 +414,11 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
   const handleSave = async () => {
     setSaving(true);
     try {
-      for (const row of localData) {
+      const updatedLocalData = [...localData];
+
+      for (let i = 0; i < updatedLocalData.length; i++) {
+        const row = updatedLocalData[i];
+        
         const dbRow: any = {
           ...row, inicio: row.inicio || null, termino: row.termino || null,
           prazo_realizado: row.prazo_realizado || null, meio_expediente: row.meio_expediente || false,
@@ -422,13 +426,22 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
           ordem: row.ordem || 0 
         };
         
+        // Remove variáveis locais antes de enviar pro banco
         delete dbRow.tempo_estimado;
+        delete dbRow.is_inicio_locked;
+        delete dbRow.is_termino_locked;
 
         if (row.id) {
           await supabase.from('pdi_entries').update(dbRow).eq('id', row.id);
         } else {
           const { data, error } = await supabase.from('pdi_entries').insert([dbRow]).select();
           if (!error && data) row.id = data[0].id;
+        }
+
+        // === TRAVA AUTOMÁTICA PÓS-SALVAMENTO ===
+        if (!isAdmin) {
+          row.is_inicio_locked = !!row.inicio;
+          row.is_termino_locked = !!row.termino;
         }
 
         if (!row.is_extra) {
@@ -449,6 +462,7 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
           }
         }
       }
+      setLocalData(updatedLocalData);
       alert('PDI Salvo com sucesso!');
     } catch (error) {
       alert('Erro ao salvar.');
@@ -471,6 +485,10 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
   const renderRow = (row: PdiEntry, index: number) => {
     const light = getTrafficLight(row);
     const minDateAttr = (!isAdmin && (row.status === 'analyst' || row.status === 'ok')) ? todayStr : undefined;
+
+    // DEFINIÇÃO VISUAL DAS TRAVAS
+    const isInicioLocked = !isAdmin && row.is_inicio_locked;
+    const isTerminoLocked = !isAdmin && row.is_termino_locked;
 
     return (
       <tr 
@@ -500,8 +518,31 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
         </td>
         
         <td className="p-1 border-r border-slate-200 text-center"><input type="text" value={row.competencia} onChange={(e) => handleInputChange(index, 'competencia', e.target.value)} className="w-full p-2 outline-none bg-transparent text-slate-500 text-[11px] font-bold text-center" /></td>
-        <td className="p-1 border-r border-slate-200"><input type="date" value={row.inicio || ''} onChange={(e) => handleInputChange(index, 'inicio', e.target.value)} className="w-full p-1.5 outline-none bg-white border border-slate-200 rounded text-xs font-medium text-slate-600 focus:border-[#2563eb]" /></td>
-        <td className="p-1 border-r border-slate-200"><input type="date" value={row.termino || ''} onChange={(e) => handleInputChange(index, 'termino', e.target.value)} className="w-full p-1.5 outline-none bg-white border border-slate-200 rounded text-xs font-medium text-slate-600 focus:border-[#2563eb]" /></td>
+        
+        {/* INPUT DE INÍCIO COM A TRAVA APLICADA */}
+        <td className="p-1 border-r border-slate-200">
+          <input 
+            type="date" 
+            value={row.inicio || ''} 
+            onChange={(e) => handleInputChange(index, 'inicio', e.target.value)} 
+            disabled={isInicioLocked}
+            className={`w-full p-1.5 outline-none border border-slate-200 rounded text-xs font-medium focus:border-[#2563eb] transition-colors ${isInicioLocked ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-white text-slate-600'}`} 
+            title={isInicioLocked ? "Apenas administradores podem alterar datas de Início salvas" : ""}
+          />
+        </td>
+        
+        {/* INPUT DE TÉRMINO COM A TRAVA APLICADA */}
+        <td className="p-1 border-r border-slate-200">
+          <input 
+            type="date" 
+            value={row.termino || ''} 
+            onChange={(e) => handleInputChange(index, 'termino', e.target.value)} 
+            disabled={isTerminoLocked}
+            className={`w-full p-1.5 outline-none border border-slate-200 rounded text-xs font-medium focus:border-[#2563eb] transition-colors ${isTerminoLocked ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-white text-slate-600'}`} 
+            title={isTerminoLocked ? "Apenas administradores podem alterar datas de Término salvas" : ""}
+          />
+        </td>
+        
         <td className="p-1 border-r border-slate-200 bg-slate-50/50">
           <div className="flex flex-col gap-1 items-center">
             <input type="date" min={minDateAttr} value={row.prazo_realizado || ''} onChange={(e) => handleInputChange(index, 'prazo_realizado', e.target.value)} className="w-full p-1.5 outline-none bg-white border border-slate-200 rounded text-xs font-bold text-[#1e3a8a] focus:border-[#2563eb]" title={!isAdmin ? "Apenas datas a partir de hoje" : "O Administrador pode editar livremente"} />
