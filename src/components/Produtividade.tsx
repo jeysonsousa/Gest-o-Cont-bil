@@ -89,7 +89,6 @@ export function Produtividade({ currentDepartment }: { currentDepartment: string
             const estimado = client?.tempo_estimado || 0;
             const responsavel = client?.responsavel || entry.responsavel;
 
-            // Identifica se é estagiário
             const userCfg = configUsuarios.find(u => u.nome === responsavel);
             const isEstag = userCfg?.isEstagiario || false;
             
@@ -97,7 +96,6 @@ export function Produtividade({ currentDepartment }: { currentDepartment: string
             
             let realizado = 0;
             if (isEstag) {
-              // REGRA DE OURO DO ESTAGIÁRIO: 1 dia na empresa = 0.5 dia faturado
               realizado = diasBrutos * 0.5; 
             } else {
               realizado = entry.meio_expediente ? Math.max(0.5, diasBrutos - 0.5) : diasBrutos;
@@ -233,7 +231,6 @@ export function Produtividade({ currentDepartment }: { currentDepartment: string
                               <td className="px-6 py-3 text-center font-bold text-[#2563eb]">
                                 <div className="flex flex-col items-center">
                                   <span>{row.realizado}d</span>
-                                  {/* EXIBIÇÃO DA REGRA DO ESTAGIÁRIO */}
                                   {row.isEstag ? (
                                     <span className="text-[9px] text-amber-600 bg-amber-50 px-1 rounded uppercase tracking-widest mt-0.5">Estagiário</span>
                                   ) : row.meioExp ? (
