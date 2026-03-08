@@ -27,8 +27,8 @@ import {
   Settings 
 } from 'lucide-react';
 
-// Variável de ambiente simulada: Substitua pelos e-mails dos fundadores/donos do sistema
-const ADMIN_EMAILS = ['jeyson@vsmweb.com.br', 'cristiane.cardoso@vsmweb.com.br'];
+// Variável de ambiente: Acesso Root (Chave Mestra do Criador do Sistema)
+const ADMIN_EMAILS = ['jeyson.cont@gmail.com'];
 
 export default function App() {
   const [session, setSession] = useState<any>(null);
