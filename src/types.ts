@@ -38,7 +38,9 @@ export interface PdiEntry {
   is_extra?: boolean;
   departamento?: string; 
   tempo_estimado?: number; 
-  ordem?: number; // NOVO: Para salvar a posição do arrastar e soltar
+  ordem?: number; 
+  is_inicio_locked?: boolean;  // NOVO: Trava antifraude de edição
+  is_termino_locked?: boolean; // NOVO: Trava antifraude de edição
 }
 
 export interface UsuarioConfig {
