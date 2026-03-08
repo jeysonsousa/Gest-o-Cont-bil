@@ -137,7 +137,6 @@ export function Dashboard({ isAdmin, currentDepartment }: DashboardProps) {
     await supabase.from('clients').update({ status: newStatusObj }).eq('id', clientId);
   };
 
-  // OPÇÃO B: Sincronização dupla do Sem Movimento
   const handleToggleSemMovimento = async (clientId: string, newValue: boolean) => {
     const client = clients.find(c => c.id === clientId);
     if (!client) return;
@@ -145,7 +144,6 @@ export function Dashboard({ isAdmin, currentDepartment }: DashboardProps) {
     setClients(clients.map(c => c.id === clientId ? { ...c, sem_movimento: newValue } : c));
     await supabase.from('clients').update({ sem_movimento: newValue }).eq('id', clientId);
 
-    // Atualiza silenciosamente na Matriz Global para manter a sincronia perfeita
     const { data: settingsData } = await supabase.from('settings').select('*').eq('id', 1).single();
     if (settingsData && settingsData.empresas_base) {
       const updatedEmpresas = settingsData.empresas_base.map((emp: EmpresaBase) => {
