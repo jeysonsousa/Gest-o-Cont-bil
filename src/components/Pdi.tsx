@@ -30,7 +30,7 @@ const formatDateForSearch = (dateStr?: string) => {
   return dateStr;
 };
 
-// DATA DE HOJE PARA O SISTEMA ANTIFRAUDE (Ajuste de Fuso Horário Brasil)
+// DATA DE HOJE PARA O SISTEMA ANTIFRAUDE
 const todayDate = new Date();
 const offset = todayDate.getTimezoneOffset();
 const todayStr = new Date(todayDate.getTime() - (offset*60*1000)).toISOString().split('T')[0];
@@ -61,7 +61,6 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
   const [showHojeModal, setShowHojeModal] = useState(false);
   const [showAtrasadasModal, setShowAtrasadasModal] = useState(false);
 
-  // ESTADO DO DRAG AND DROP
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
   useEffect(() => {
@@ -359,6 +358,14 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
   };
 
   const handleInputChange = (index: number, field: keyof PdiEntry, value: string | number | boolean) => {
+    // === NOVO SISTEMA ANTIFRAUDE DIRETO NO TECLADO ===
+    if (field === 'prazo_realizado' && !isAdmin && typeof value === 'string' && value !== '') {
+      if (value < todayStr) {
+        alert(`AÇÃO BLOQUEADA PELA GESTÃO!\n\nVocê tentou inserir uma data retroativa (${value.split('-').reverse().join('/')}).\n\nO sistema antifraude só permite registrar a conclusão com a data de hoje (${todayStr.split('-').reverse().join('/')}) em diante.`);
+        return; // Retorna imediatamente e não deixa a data falsa ir para o estado da tela!
+      }
+    }
+
     const newData = [...localData];
     newData[index] = { ...newData[index], [field]: value };
     setLocalData(newData);
@@ -387,7 +394,10 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
     const row = newData[index];
     if (row.status === 'n') {
       newData[index].status = 'analyst';
-      if (!row.prazo_realizado) newData[index].prazo_realizado = todayStr;
+      // Se não tem data, ou se tinha uma data retrógrada vazada, força o dia de hoje.
+      if (!row.prazo_realizado || (!isAdmin && row.prazo_realizado < todayStr)) {
+        newData[index].prazo_realizado = todayStr;
+      }
     } else {
       newData[index].status = 'n';
     }
@@ -403,18 +413,7 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
   };
 
   const handleSave = async () => {
-    // === SISTEMA ANTIFRAUDE: CHECAGEM ANTES DE SALVAR ===
-    if (!isAdmin) {
-      const invalidEntry = localData.find(row => {
-        return (row.status === 'analyst' || row.status === 'ok') && row.prazo_realizado && row.prazo_realizado < todayStr;
-      });
-
-      if (invalidEntry) {
-        alert(`AÇÃO BLOQUEADA! Você está tentando salvar a tarefa "${invalidEntry.atividade}" da empresa "${invalidEntry.empresa}" com uma data de realização (${invalidEntry.prazo_realizado?.split('-').reverse().join('/')}) retroativa. \n\nO sistema só permite informar que a tarefa foi concluída a partir de hoje.`);
-        return; 
-      }
-    }
-
+    // O bloqueio global foi removido. A proteção agora é feita no handleInputChange.
     setSaving(true);
     try {
       for (const row of localData) {
@@ -473,7 +472,7 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
 
   const renderRow = (row: PdiEntry, index: number) => {
     const light = getTrafficLight(row);
-    // Para analistas, a data mínima no calendário é hoje. Admins podem colocar qualquer data.
+    // Trava do Calendário: O Admin pode escolher passado. Analista só de hoje pra frente.
     const minDateAttr = (!isAdmin && (row.status === 'analyst' || row.status === 'ok')) ? todayStr : undefined;
 
     return (
@@ -509,7 +508,7 @@ export function Pdi({ currentDepartment }: { currentDepartment: string }) {
         <td className="p-1 border-r border-slate-200 bg-slate-50/50">
           <div className="flex flex-col gap-1 items-center">
             {/* O Calendário de Prazo Realizado com a Trava Ativa */}
-            <input type="date" min={minDateAttr} value={row.prazo_realizado || ''} onChange={(e) => handleInputChange(index, 'prazo_realizado', e.target.value)} className={`w-full p-1.5 outline-none bg-white border border-slate-200 rounded text-xs font-bold text-[#1e3a8a] focus:border-[#2563eb] ${(!isAdmin && row.status !== 'n' && row.prazo_realizado && row.prazo_realizado < todayStr) ? 'border-red-500 text-red-600' : ''}`} title={!isAdmin ? "Apenas datas a partir de hoje" : "O Administrador pode editar livremente"} />
+            <input type="date" min={minDateAttr} value={row.prazo_realizado || ''} onChange={(e) => handleInputChange(index, 'prazo_realizado', e.target.value)} className="w-full p-1.5 outline-none bg-white border border-slate-200 rounded text-xs font-bold text-[#1e3a8a] focus:border-[#2563eb]" title={!isAdmin ? "Apenas datas a partir de hoje" : "O Administrador pode editar livremente"} />
             <label className="flex items-center gap-1 cursor-pointer hover:bg-slate-200 px-1.5 rounded transition-colors" title="Marque se utilizou apenas meio expediente">
               <input type="checkbox" checked={row.meio_expediente || false} onChange={(e) => handleInputChange(index, 'meio_expediente', e.target.checked)} className="w-3 h-3 text-[#2563eb] rounded border-slate-300 focus:ring-[#2563eb]" />
               <span className="text-[9px] font-bold text-slate-500 uppercase">-0,5 DIA</span>
