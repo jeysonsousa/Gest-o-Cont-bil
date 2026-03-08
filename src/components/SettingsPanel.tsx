@@ -48,7 +48,6 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
   
   const [sortConfig, setSortConfig] = useState<{ key: 'nome' | 'tributacao' | 'metas', direction: 'asc' | 'desc' } | null>(null);
   
-  // ESTADOS DO MODAL DA EMPRESA MATRIZ
   const [empresaId, setEmpresaId] = useState('');
   const [empresaNome, setEmpresaNome] = useState('');
   const [empresaTrib, setEmpresaTrib] = useState('');
@@ -76,7 +75,6 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
       }
       setUsuarios(parsedUsers.map(u => ({ ...u, departamentos: u.departamentos || [], isEstagiario: u.isEstagiario || false, isAdmin: u.isAdmin || false })));
 
-      // AUTO-MIGRAÇÃO: Cria a matriz de departamentos lendo os clientes já alocados no painel!
       let baseEmpresas = settings.empresas_base || [];
       const needsMigration = baseEmpresas.some(e => !e.alocacoes);
       
@@ -115,7 +113,6 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
     loadAndMigrate();
   }, [settings]);
 
-  // === ROBÔ DE SINCRONIZAÇÃO TOTAL (ZERO DATA ENTRY) ===
   const handleSave = async () => {
     setSaving(true);
     const finalSettings = { ...localSettings, usuarios: JSON.stringify(usuarios) };
@@ -126,11 +123,10 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
       const { data: allClients } = await supabase.from('clients').select('*');
       if (allClients) {
         const upserts: any[] = [];
-        const validClientKeys = new Set(); // Para limpar o que foi desativado na matriz
+        const validClientKeys = new Set(); 
 
         finalSettings.empresas_base?.forEach(emp => {
           if (emp.is_inactive) {
-            // Se a empresa foi inativada na raiz, inativa todos os vínculos dela
             allClients.filter(c => c.empresa === emp.nome).forEach(c => {
               if (!c.is_inactive) upserts.push({ ...c, is_inactive: true });
             });
@@ -140,7 +136,6 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
           Object.entries(emp.alocacoes || {}).forEach(([dept, aloc]) => {
             validClientKeys.add(`${emp.nome}|${dept}`);
             
-            // Calcula o tempo mágico somando as metas
             const deptMetas = finalSettings.metas_globais?.filter(m => m.departamento === dept) || [];
             const deptMetaIds = deptMetas.map(m => m.id);
             let totalTime = 0;
@@ -151,7 +146,6 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
             const existingClient = allClients.find(c => c.empresa === emp.nome && c.departamento === dept);
 
             if (existingClient) {
-              // Atualiza o existente protegendo as bolinhas de histórico (status)
               if (existingClient.responsavel !== aloc.responsavel || existingClient.prioridade !== aloc.prioridade || existingClient.atividade !== emp.atividade || existingClient.tributacao !== emp.tributacao || existingClient.tempo_estimado !== totalTime || existingClient.sem_movimento !== aloc.sem_movimento || existingClient.is_inactive === true) {
                 upserts.push({
                   ...existingClient,
@@ -165,7 +159,6 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
                 });
               }
             } else {
-              // Insere uma nova alocação magicamente
               upserts.push({
                 empresa: emp.nome,
                 departamento: dept,
@@ -176,13 +169,12 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
                 tempo_estimado: totalTime,
                 sem_movimento: aloc.sem_movimento,
                 is_inactive: false,
-                status: {} // Bolinhas zeradas
+                status: {} 
               });
             }
           });
         });
 
-        // Remove (inativa) do painel as alocacoes que o admin desligou a chavinha
         allClients.forEach(c => {
           if (!validClientKeys.has(`${c.empresa}|${c.departamento}`) && !c.is_inactive) {
             const empGlob = finalSettings.empresas_base?.find(e => e.nome === c.empresa);
@@ -274,7 +266,6 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
     setLocalSettings({ ...localSettings, metas_globais: metas, empresas_base: empresas });
   };
 
-  // === LÓGICA DO MODAL MATRIZ DA EMPRESA ===
   const openEmpresaModal = (emp?: EmpresaBase) => {
     if (emp) {
       setEmpresaId(emp.id); setEmpresaNome(emp.nome); setEmpresaTrib(emp.tributacao || ''); setEmpresaAtividade(emp.atividade || '');
@@ -457,7 +448,6 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
                         <td className="px-4 py-3 text-center text-[#2563eb] font-bold text-xs bg-[#f0f4ff]/50">{emp.metas_vinculadas?.length || 0} metas</td>
                         <td className="px-4 py-3 text-right">
                           <div className="flex items-center justify-end gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                            {/* Pílulas que mostram em quais setores a empresa está alocada */}
                             <div className="flex gap-1 mr-2">
                               {safeDepartamentos.map(d => emp.alocacoes && emp.alocacoes[d] ? <span key={d} className="bg-[#dbeafe] text-[#1e3a8a] text-[9px] font-bold px-1.5 py-0.5 rounded uppercase" title={`Responsável: ${emp.alocacoes[d].responsavel}`}>{d.substring(0,3)}</span> : null)}
                             </div>
@@ -475,12 +465,11 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
           </div>
         )}
 
-        {/* OUTRAS ABAS INALTERADAS (Ocultado código interno por clareza, mas mantido na execução) */}
         {activeTab === 'metas' && (
           <div className="max-w-3xl animate-fade-in"><div className="mb-6"><h3 className="text-xl font-bold text-[#1e3a8a]">Biblioteca de Metas (Ações)</h3></div><div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 mb-8 shadow-inner"><div className="flex flex-col md:flex-row gap-3"><input type="text" value={newMetaNome} onChange={(e) => setNewMetaNome(e.target.value)} placeholder="Nome da Meta (Ex: Fechamento de folha)" className="flex-1 px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-[#2563eb] font-bold text-sm text-slate-700" /><select value={newMetaDept} onChange={(e) => setNewMetaDept(e.target.value)} className="md:w-48 px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-[#2563eb] text-sm font-bold text-slate-700"><option value="">Qual setor?</option>{safeDepartamentos.map(d => <option key={d} value={d}>{d}</option>)}</select><button onClick={addMetaGlobal} disabled={!newMetaNome || !newMetaDept} className="bg-[#2563eb] hover:bg-[#1e3a8a] text-white px-6 py-2 rounded-lg font-bold transition-colors shadow-sm disabled:opacity-50 flex items-center justify-center gap-2"><Plus size={18} /> Criar</button></div></div><div className="space-y-3">{safeDepartamentos.map(dept => {const metasDoDept = safeMetasGlobais.filter(m => m.departamento === dept); if(metasDoDept.length === 0) return null; return (<div key={dept} className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm"><div className="bg-slate-100 p-3 border-b border-slate-200 font-black text-slate-700 uppercase text-xs tracking-wider flex items-center gap-2"><Target size={14} className="text-[#2563eb]"/> Metas do {dept} ({metasDoDept.length})</div><div className="divide-y divide-slate-100">{metasDoDept.map(meta => (<div key={meta.id} className="flex justify-between items-center p-3 hover:bg-slate-50 transition-colors group"><span className="font-bold text-slate-800 text-sm">{meta.nome}</span><button onClick={() => removeMetaGlobal(meta.id)} className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all p-1.5 rounded hover:bg-red-50" title="Excluir Meta Geral"><Trash2 size={16} /></button></div>))}</div></div>);})}</div></div>
         )}
         {activeTab === 'colaboradores' && (
-          <div className="max-w-4xl animate-fade-in"><div className="mb-6"><h3 className="text-xl font-bold text-[#1e3a8a]">Gestão de Colaboradores e Acessos</h3></div><div className={`border rounded-2xl p-5 mb-8 shadow-inner transition-colors ${editingUserIndex !== null ? 'bg-[#f0f4ff] border-[#bfdbfe]' : 'bg-slate-50 border-slate-200'}`}><div className="flex justify-between items-center mb-3"><h4 className={`text-sm font-bold uppercase tracking-wider ${editingUserIndex !== null ? 'text-[#1e3a8a]' : 'text-slate-700'}`}>{editingUserIndex !== null ? 'Editando Colaborador' : 'Novo Colaborador'}</h4>{editingUserIndex !== null && <button onClick={() => {setEditingUserIndex(null); setNewUserNome(''); setNewUserEmail(''); setNewUserDepts([]); setNewUserIsEstagiario(false); setNewUserIsAdmin(false);}} className="text-slate-400 hover:text-slate-700 text-xs font-bold underline">Cancelar Edição</button>}</div><div className="flex flex-col md:flex-row gap-4 items-start"><div className="flex-1 w-full space-y-3"><input type="text" value={newUserNome} onChange={(e) => setNewUserNome(e.target.value)} placeholder="Nome (Ex: CAMILA)" className="w-full px-4 py-2 bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-[#2563eb] uppercase font-bold text-sm" /><input type="email" value={newUserEmail} onChange={(e) => setNewUserEmail(e.target.value)} placeholder="E-mail de acesso (@vsmweb.com.br)" className="w-full px-4 py-2 bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-[#2563eb] text-sm" /><div className="flex flex-col gap-2 mt-3 p-3 bg-white border border-slate-200 rounded-lg"><label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={newUserIsEstagiario} onChange={(e) => setNewUserIsEstagiario(e.target.checked)} className="w-4 h-4 text-[#2563eb] rounded border-slate-300 focus:ring-[#2563eb]" /><span className="text-sm font-bold text-slate-600">É Estagiário</span></label><hr className="border-slate-100" /><label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={newUserIsAdmin} onChange={(e) => setNewUserIsAdmin(e.target.checked)} className="w-4 h-4 text-red-600 rounded border-red-300 focus:ring-red-600" /><span className="text-sm font-black text-red-600">É Administrador</span></label></div></div><div className={`w-full md:w-auto bg-white border border-slate-200 p-3 rounded-lg flex-1 transition-opacity ${newUserIsAdmin ? 'opacity-50 pointer-events-none' : ''}`}><span className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Vincular aos Setores: {newUserIsAdmin && "(Admin vê todos)"}</span><div className="flex flex-wrap gap-2">{safeDepartamentos.map(dept => (<label key={dept} className={`flex items-center gap-1.5 px-3 py-1.5 border rounded-lg cursor-pointer transition-colors text-xs font-bold select-none ${newUserDepts.includes(dept) ? 'bg-[#dbeafe] border-[#bfdbfe] text-[#1e3a8a]' : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'}`}><input type="checkbox" className="hidden" checked={newUserDepts.includes(dept)} onChange={() => toggleNewUserDept(dept)} />{dept}</label>))}</div></div><button onClick={saveUser} disabled={!newUserNome || !newUserEmail || (!newUserIsAdmin && newUserDepts.length === 0)} className={`w-full md:w-auto h-full min-h-[85px] text-white px-6 py-2 rounded-xl font-bold transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${editingUserIndex !== null ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-[#2563eb] hover:bg-[#1e3a8a]'}`}>{editingUserIndex !== null ? <Check size={20} /> : <Plus size={20} />}</button></div></div><div className="space-y-3">{usuarios.map((user, index) => (<div key={index} className={`border rounded-xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 group shadow-sm hover:border-[#2563eb] transition-all ${editingUserIndex === index ? 'border-[#2563eb] bg-[#f0f4ff]/50' : 'bg-white border-slate-200'}`}><div><h4 className="font-black text-slate-800 text-lg uppercase flex items-center gap-2">{user.nome} {user.isEstagiario && <span className="bg-amber-100 text-amber-700 text-[10px] px-2 py-0.5 rounded font-bold tracking-wider">ESTAGIÁRIO</span>}{user.isAdmin && <span className="bg-red-100 text-red-700 text-[10px] px-2 py-0.5 rounded font-bold tracking-wider border border-red-200">ADMIN</span>}</h4><span className="text-sm text-slate-500 font-medium">{user.email}</span></div><div className="flex-1 flex flex-wrap justify-end gap-2">{user.isAdmin ? (<span className="text-xs font-bold text-red-500 uppercase">Acesso Global</span>) : (safeDepartamentos.map(dept => {const isLinked = user.departamentos?.includes(dept); return isLinked ? <span key={dept} className="bg-[#f0f4ff] border border-[#bfdbfe] text-[#2563eb] px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider">{dept}</span> : null; }))}</div><div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity"><button onClick={() => editUser(index)} className="text-slate-400 hover:text-[#2563eb] p-2 rounded-lg hover:bg-[#f0f4ff] transition-colors"><Edit2 size={16} /></button><button onClick={() => removeUser(index)} className="text-slate-400 hover:text-red-500 p-2 rounded-lg hover:bg-red-50 transition-colors"><Trash2 size={16} /></button></div></div>))}</div></div>
+          <div className="max-w-4xl animate-fade-in"><div className="mb-6"><h3 className="text-xl font-bold text-[#1e3a8a]">Gestão de Colaboradores e Acessos</h3></div><div className={`border rounded-2xl p-5 mb-8 shadow-inner transition-colors ${editingUserIndex !== null ? 'bg-[#f0f4ff] border-[#bfdbfe]' : 'bg-slate-50 border-slate-200'}`}><div className="flex justify-between items-center mb-3"><h4 className={`text-sm font-bold uppercase tracking-wider ${editingUserIndex !== null ? 'text-[#1e3a8a]' : 'text-slate-700'}`}>{editingUserIndex !== null ? 'Editando Colaborador' : 'Novo Colaborador'}</h4>{editingUserIndex !== null && <button onClick={() => {setEditingUserIndex(null); setNewUserNome(''); setNewUserEmail(''); setNewUserDepts([]); setNewUserIsEstagiario(false); setNewUserIsAdmin(false);}} className="text-slate-400 hover:text-slate-700 text-xs font-bold underline">Cancelar Edição</button>}</div><div className="flex flex-col md:flex-row gap-4 items-start"><div className="flex-1 w-full space-y-3"><input type="text" value={newUserNome} onChange={(e) => setNewUserNome(e.target.value)} placeholder="Nome (Ex: CAMILA)" className="w-full px-4 py-2 bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-[#2563eb] uppercase font-bold text-sm" /><input type="email" value={newUserEmail} onChange={(e) => setNewUserEmail(e.target.value)} placeholder="E-mail corporativo (@empresa.com.br)" className="w-full px-4 py-2 bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-[#2563eb] text-sm" /><div className="flex flex-col gap-2 mt-3 p-3 bg-white border border-slate-200 rounded-lg"><label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={newUserIsEstagiario} onChange={(e) => setNewUserIsEstagiario(e.target.checked)} className="w-4 h-4 text-[#2563eb] rounded border-slate-300 focus:ring-[#2563eb]" /><span className="text-sm font-bold text-slate-600">É Estagiário</span></label><hr className="border-slate-100" /><label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={newUserIsAdmin} onChange={(e) => setNewUserIsAdmin(e.target.checked)} className="w-4 h-4 text-red-600 rounded border-red-300 focus:ring-red-600" /><span className="text-sm font-black text-red-600">É Administrador</span></label></div></div><div className={`w-full md:w-auto bg-white border border-slate-200 p-3 rounded-lg flex-1 transition-opacity ${newUserIsAdmin ? 'opacity-50 pointer-events-none' : ''}`}><span className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Vincular aos Setores: {newUserIsAdmin && "(Admin vê todos)"}</span><div className="flex flex-wrap gap-2">{safeDepartamentos.map(dept => (<label key={dept} className={`flex items-center gap-1.5 px-3 py-1.5 border rounded-lg cursor-pointer transition-colors text-xs font-bold select-none ${newUserDepts.includes(dept) ? 'bg-[#dbeafe] border-[#bfdbfe] text-[#1e3a8a]' : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'}`}><input type="checkbox" className="hidden" checked={newUserDepts.includes(dept)} onChange={() => toggleNewUserDept(dept)} />{dept}</label>))}</div></div><button onClick={saveUser} disabled={!newUserNome || !newUserEmail || (!newUserIsAdmin && newUserDepts.length === 0)} className={`w-full md:w-auto h-full min-h-[85px] text-white px-6 py-2 rounded-xl font-bold transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${editingUserIndex !== null ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-[#2563eb] hover:bg-[#1e3a8a]'}`}>{editingUserIndex !== null ? <Check size={20} /> : <Plus size={20} />}</button></div></div><div className="space-y-3">{usuarios.map((user, index) => (<div key={index} className={`border rounded-xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 group shadow-sm hover:border-[#2563eb] transition-all ${editingUserIndex === index ? 'border-[#2563eb] bg-[#f0f4ff]/50' : 'bg-white border-slate-200'}`}><div><h4 className="font-black text-slate-800 text-lg uppercase flex items-center gap-2">{user.nome} {user.isEstagiario && <span className="bg-amber-100 text-amber-700 text-[10px] px-2 py-0.5 rounded font-bold tracking-wider">ESTAGIÁRIO</span>}{user.isAdmin && <span className="bg-red-100 text-red-700 text-[10px] px-2 py-0.5 rounded font-bold tracking-wider border border-red-200">ADMIN</span>}</h4><span className="text-sm text-slate-500 font-medium">{user.email}</span></div><div className="flex-1 flex flex-wrap justify-end gap-2">{user.isAdmin ? (<span className="text-xs font-bold text-red-500 uppercase">Acesso Global</span>) : (safeDepartamentos.map(dept => {const isLinked = user.departamentos?.includes(dept); return isLinked ? <span key={dept} className="bg-[#f0f4ff] border border-[#bfdbfe] text-[#2563eb] px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider">{dept}</span> : null; }))}</div><div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity"><button onClick={() => editUser(index)} className="text-slate-400 hover:text-[#2563eb] p-2 rounded-lg hover:bg-[#f0f4ff] transition-colors"><Edit2 size={16} /></button><button onClick={() => removeUser(index)} className="text-slate-400 hover:text-red-500 p-2 rounded-lg hover:bg-red-50 transition-colors"><Trash2 size={16} /></button></div></div>))}</div></div>
         )}
         {activeTab === 'departamentos' && (
           <div className="max-w-2xl animate-fade-in"><div className="mb-6"><h3 className="text-xl font-bold text-[#1e3a8a]">Gestão de Departamentos</h3></div><div className="flex gap-2 mb-6"><input type="text" value={newDepartamento} onChange={(e) => setNewDepartamento(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addItemString('departamentos', newDepartamento, setNewDepartamento)} placeholder="NOME DO NOVO SETOR" className="flex-1 px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20 uppercase font-bold" /><button onClick={() => addItemString('departamentos', newDepartamento, setNewDepartamento)} className="bg-[#2563eb] hover:bg-[#1e3a8a] text-white px-4 py-2 rounded-lg font-bold"><Plus size={20} /></button></div><div className="grid grid-cols-2 gap-3">{safeDepartamentos.map((dept, idx) => (<div key={idx} className="bg-white border border-slate-200 rounded-xl p-4 flex justify-between items-center group shadow-sm"><span className="font-bold text-slate-700">{dept}</span><button onClick={() => removeItemString('departamentos', idx)} className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100"><Trash2 size={16} /></button></div>))}</div></div>
@@ -505,7 +494,7 @@ export function SettingsPanel({ settings, setSettings }: SettingsPanelProps) {
               <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
                 <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Dados Principais</h4>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div><label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Nome da Empresa</label><input type="text" value={empresaNome} onChange={(e) => setEmpresaNome(e.target.value)} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:border-[#2563eb] uppercase font-bold" placeholder="EX: VSM TECNOLOGIA" /></div>
+                  <div><label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Nome da Empresa</label><input type="text" value={empresaNome} onChange={(e) => setEmpresaNome(e.target.value)} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:border-[#2563eb] uppercase font-bold" placeholder="EX: EMPRESA MODELO LTDA" /></div>
                   <div><label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Tributação</label><select value={empresaTrib} onChange={(e) => setEmpresaTrib(e.target.value)} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:border-[#2563eb] font-bold text-slate-700"><option value="">Selecione...</option>{safeTributacoes.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
                   <div><label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Atividade</label><select value={empresaAtividade} onChange={(e) => setEmpresaAtividade(e.target.value)} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:border-[#2563eb] font-bold text-slate-700"><option value="">Selecione...</option>{safeAtividades.map(a => <option key={a} value={a}>{a}</option>)}</select></div>
                 </div>
